@@ -20,6 +20,48 @@ security issues. Now with terraform v0.12+ support.
 
 ![Example screenshot](screenshot.png)
 
+
+
+## Binary verification
+
+Binaries are signed with the key `D66B222A3EA4C25D5D1A097FC34ACEFB46EC39CE`, the public file is available at https://github.com/tfsec/tfsec/blob/master/utils/gpg_keys/signing.D66B222A3EA4C25D5D1A097FC34ACEFB46EC39CE.asc.
+
+### Verification Steps
+
+1. Get the signing key
+   ```
+   wget -O tfsec_signing.asc https://github.com/tfsec/tfsec/blob/master/utils/gpg_keys/signing.D66B222A3EA4C25D5D1A097FC34ACEFB46EC39CE.asc
+   ```
+
+2. Verify the signing file - the signature should match;
+   ```
+   gpg --keyid-format long --with-fingerprint tfsec_signing.asc
+
+   pub   rsa4096/C34ACEFB46EC39CE 2021-05-20 [SC]
+      Key fingerprint = D66B 222A 3EA4 C25D 5D1A  097F C34A CEFB 46EC 39CE
+   uid                           Tfsec Signing (Code signing for tfsec) <signing@tfsec.dev>
+   sub   rsa4096/5053A8BAE961BC49 2021-05-20 [E]
+
+   ```
+
+3. Import the signing key file
+   ```
+   gpg --import tfsec_signing.asc
+   ```
+
+4. Download your required binary and the associated `.sig` file
+
+5. Verify the downloaded binaries
+   ```
+   gpg --verify <binary_file>.D66B222A3EA4C25D5D1A097FC34ACEFB46EC39CE.sig <binary_file>
+
+   # expected output
+   gpg: Signature made Fri 21 May 2021 12:33:33 BST
+   gpg:                using RSA key D66B222A3EA4C25D5D1A097FC34ACEFB46EC39CE
+   gpg: Good signature from "Tfsec Signing (Code signing for tfsec) <signing@tfsec.dev>" [ultimate]
+   ```
+
+
 ## Installation
 
 Install with brew/linuxbrew:
