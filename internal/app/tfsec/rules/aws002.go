@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSNoBucketLogging = "AWS002"
@@ -52,19 +52,19 @@ func init() {
 				"https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_s3_bucket"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
-			if loggingBlock := block.GetBlock("logging"); loggingBlock == nil {
-				if block.GetAttribute("acl") != nil && block.GetAttribute("acl").Equals("log-delivery-write") {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_s3_bucket"},
+		DefaultSeverity: severity.Medium,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
+			if loggingBlock := resourceBlock.GetBlock("logging"); loggingBlock == nil {
+				if resourceBlock.GetAttribute("acl") != nil && resourceBlock.GetAttribute("acl").Equals("log-delivery-write") {
 					return
 				}
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' does not have logging enabled.", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' does not have logging enabled.", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
 			}
 		},

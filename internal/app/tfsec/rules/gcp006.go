@@ -3,23 +3,22 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 
 	"github.com/zclconf/go-cty/cty"
 )
 
-// GkeNodeMetadataExposed See https://github.com/tfsec/tfsec#included-checks for check info
 const GkeNodeMetadataExposed = "GCP006"
 const GkeNodeMetadataExposedDescription = "Node metadata value disables metadata concealment."
 const GkeNodeMetadataExposedImpact = "Metadata that isn't concealed potentially risks leakage of sensitive data"
@@ -62,20 +61,33 @@ func init() {
 				"https://www.terraform.io/docs/providers/google/r/container_cluster.html#node_metadata",
 			},
 		},
-		Provider:       provider.GCPProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"google_container_cluster", "google_container_node_pool"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.GCPProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"google_container_cluster", "google_container_node_pool"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			nodeMetadata := block.GetBlock("node_config").GetBlock("workload_metadata_config").GetAttribute("node_metadata")
+			if resourceBlock.MissingChild("node_config") {
+				return
+			}
+			nodeConfigBlock := resourceBlock.GetBlock("node_config")
 
+			if nodeConfigBlock.MissingChild("workload_metadata_config") {
+				return
+			}
+			workloadMetadataConfigBlock := nodeConfigBlock.GetBlock("workload_metadata_config")
+
+			if workloadMetadataConfigBlock.MissingChild("node_metadata") {
+				return
+			}
+
+			nodeMetadata := workloadMetadataConfigBlock.GetAttribute("node_metadata")
 			if nodeMetadata != nil && nodeMetadata.Type() == cty.String &&
 				(nodeMetadata.Value().AsString() == "EXPOSE" || nodeMetadata.Value().AsString() == "UNSPECIFIED") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' defines a cluster with node metadata exposed. node_metadata set to EXPOSE or UNSPECIFIED disables metadata concealment. ", block.FullName())).
-						WithRange(nodeMetadata.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' defines a cluster with node metadata exposed. node_metadata set to EXPOSE or UNSPECIFIED disables metadata concealment. ", resourceBlock.FullName())).
+						WithRange(nodeMetadata.Range()),
 				)
 			}
 

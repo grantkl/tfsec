@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AZUKeyVaultPurgeProtection = "AZU021"
@@ -59,25 +59,25 @@ func init() {
 				"https://docs.microsoft.com/en-us/azure/key-vault/general/soft-delete-overview#purge-protection",
 			},
 		},
-		Provider:       provider.AzureProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"azurerm_key_vault"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AzureProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"azurerm_key_vault"},
+		DefaultSeverity: severity.Medium,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if block.MissingChild("purge_protection_enabled") || block.GetAttribute("purge_protection_enabled").IsFalse() {
+			if resourceBlock.MissingChild("purge_protection_enabled") || resourceBlock.GetAttribute("purge_protection_enabled").IsFalse() {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' should have purge protection enabled.", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Warning),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' should have purge protection enabled.", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
+				return
 			}
-			if block.GetAttribute("purge_protection_enabled").IsTrue() && (block.MissingChild("soft_delete_retention_days") || block.GetAttribute("soft_delete_retention_days").LessThan(1)) {
+			if resourceBlock.MissingChild("soft_delete_retention_days") || resourceBlock.GetAttribute("soft_delete_retention_days").LessThan(1) {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' should have soft_delete_retention_days set in order to enabled purge protection.", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Warning),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' should have soft_delete_retention_days set in order to enabled purge protection.", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
 			}
 		},

@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSCheckLambdaFunctionForSourceARN = "AWS058"
@@ -59,19 +59,19 @@ func init() {
 				"https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-permission.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_lambda_permission"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_lambda_permission"},
+		DefaultSeverity: severity.Critical,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if block.HasChild("principal") {
-				if block.GetAttribute("principal").EndsWith("amazonaws.com") {
-					if block.MissingChild("source_arn") {
+			if resourceBlock.HasChild("principal") {
+				if resourceBlock.GetAttribute("principal").EndsWith("amazonaws.com") {
+					if resourceBlock.MissingChild("source_arn") {
 						set.Add(
-							result.New().
-								WithDescription(fmt.Sprintf("Resource '%s' missing source ARN but has *.amazonaws.com Principal.", block.FullName())).
-								WithRange(block.Range()).
-								WithSeverity(severity.Error),
+							result.New(resourceBlock).
+								WithDescription(fmt.Sprintf("Resource '%s' missing source ARN but has *.amazonaws.com Principal.", resourceBlock.FullName())).
+								WithRange(resourceBlock.Range()),
 						)
 					}
 				}

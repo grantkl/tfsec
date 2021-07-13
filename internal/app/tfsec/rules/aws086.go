@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSDynamoDBRecoveryEnabled = "AWS086"
@@ -22,7 +22,7 @@ const AWSDynamoDBRecoveryEnabledDescription = "Point in time recovery should be 
 const AWSDynamoDBRecoveryEnabledImpact = "Accidental or malicious writes and deletes can't be rolled back"
 const AWSDynamoDBRecoveryEnabledResolution = "Enable point in time recovery"
 const AWSDynamoDBRecoveryEnabledExplanation = `
-DynamoDB tables should be protected against accidently or malicious write/delete actions by ensuring that there is adaquate protection.
+DynamoDB tables should be protected against accidentally or malicious write/delete actions by ensuring that there is adequate protection.
 
 By enabling point-in-time-recovery you can restore to a known point in the event of loss of data.
 `
@@ -74,37 +74,37 @@ func init() {
 				"https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/PointInTimeRecovery.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_dynamodb_table"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_dynamodb_table"},
+		DefaultSeverity: severity.Medium,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if block.MissingChild("point_in_time_recovery") {
+			if resourceBlock.MissingChild("point_in_time_recovery") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' doesn't have point in time recovery", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Warning),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' doesn't have point in time recovery", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
+				return
 			}
 
-			poitBlock := block.GetBlock("point_in_time_recovery")
+			poitBlock := resourceBlock.GetBlock("point_in_time_recovery")
 			if poitBlock.MissingChild("enabled") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' doesn't have point in time recovery enabled", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Warning),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' doesn't have point in time recovery enabled", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
+				return
 			}
 			enabledAttr := poitBlock.GetAttribute("enabled")
 			if enabledAttr.IsFalse() {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' doesn't have point in time recovery enabled", block.FullName())).
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' doesn't have point in time recovery enabled", resourceBlock.FullName())).
 						WithRange(enabledAttr.Range()).
-						WithAttributeAnnotation(enabledAttr).
-						WithSeverity(severity.Warning),
+						WithAttributeAnnotation(enabledAttr),
 				)
 			}
 

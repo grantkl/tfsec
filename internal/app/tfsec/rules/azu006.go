@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AZUAKSClusterNetworkPolicy = "AZU006"
@@ -54,18 +54,18 @@ func init() {
 				"https://kubernetes.io/docs/concepts/services-networking/network-policies",
 			},
 		},
-		Provider:       provider.AzureProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"azurerm_kubernetes_cluster"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AzureProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"azurerm_kubernetes_cluster"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if networkProfileBlock := block.GetBlock("network_profile"); networkProfileBlock != nil {
+			if networkProfileBlock := resourceBlock.GetBlock("network_profile"); networkProfileBlock != nil {
 				if networkProfileBlock.GetAttribute("network_policy") == nil {
 					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' do not have network_policy define. network_policy should be defined to have opportunity allow or block traffic to pods", block.FullName())).
-							WithRange(networkProfileBlock.Range()).
-							WithSeverity(severity.Error),
+						result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("Resource '%s' do not have network_policy define. network_policy should be defined to have opportunity allow or block traffic to pods", resourceBlock.FullName())).
+							WithRange(networkProfileBlock.Range()),
 					)
 				}
 			}

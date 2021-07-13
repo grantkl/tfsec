@@ -3,14 +3,15 @@ package severity
 type Severity string
 
 const (
-	None    Severity = "NONE"
-	Error   Severity = "ERROR"
-	Warning Severity = "WARNING"
-	Info    Severity = "INFO"
+	None     Severity = ""
+	Critical Severity = "CRITICAL"
+	High     Severity = "HIGH"
+	Medium   Severity = "MEDIUM"
+	Low      Severity = "LOW"
 )
 
 var ValidSeverity = []Severity{
-	Error, Warning, Info,
+	Critical, High, Medium, Low,
 }
 
 func (s *Severity) IsValid() bool {

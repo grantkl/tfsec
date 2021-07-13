@@ -2,20 +2,19 @@ package rules
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSSecretsManagerSecretEncryption = "AWS095"
@@ -23,7 +22,7 @@ const AWSSecretsManagerSecretEncryptionDescription = "Secrets Manager should use
 const AWSSecretsManagerSecretEncryptionImpact = "Using AWS managed keys reduces the flexibility and control over the encryption key"
 const AWSSecretsManagerSecretEncryptionResolution = "Use customer managed keys"
 const AWSSecretsManagerSecretEncryptionExplanation = `
-Secrets Manager encrypts secrets by default using a default key created by AWS. To ensure control and granularity of secret encryption, CMK's should be used explictly.
+Secrets Manager encrypts secrets by default using a default key created by AWS. To ensure control and granularity of secret encryption, CMK's should be used explicitly.
 `
 const AWSSecretsManagerSecretEncryptionBadExample = `
 resource "aws_secretsmanager_secret" "bad_example" {
@@ -56,45 +55,35 @@ func init() {
 				"https://docs.aws.amazon.com/kms/latest/developerguide/services-secrets-manager.html#asm-encrypt",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_secretsmanager_secret"},
-		CheckFunc: func(set result.Set, block *block.Block, ctx *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_secretsmanager_secret"},
+		DefaultSeverity: severity.Low,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, ctx *hclcontext.Context) {
 
-			if block.MissingChild("kms_key_id") {
+			if resourceBlock.MissingChild("kms_key_id") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' does not use CMK", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Info),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' does not use CMK", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
 				return
 			}
 
-			kmsKeyAttr := block.GetAttribute("kms_key_id")
-			if kmsKeyAttr.ReferencesDataBlock() {
-				ref := kmsKeyAttr.ReferenceAsString()
-				dataReferenceParts := strings.Split(ref, ".")
-				if len(dataReferenceParts) < 3 {
+			kmsKeyAttr := resourceBlock.GetAttribute("kms_key_id")
+			if kmsKeyAttr.IsDataBlockReference() {
+				kmsData, err := ctx.GetReferencedBlock(kmsKeyAttr)
+				if err != nil {
 					return
 				}
-				blockType := dataReferenceParts[0]
-				blockName := dataReferenceParts[1]
-				kmsKeyDatas := ctx.GetDatasByType(blockType)
-				for _, kmsData := range kmsKeyDatas {
-					if kmsData.NameLabel() == blockName {
-						keyIdAttr := kmsData.GetAttribute("key_id")
-						if keyIdAttr != nil && keyIdAttr.Equals("alias/aws/secretsmanager") {
-							set.Add(
-								result.New().
-									WithDescription(fmt.Sprintf("Resource '%s' explicitly uses the default CMK", block.FullName())).
-									WithRange(kmsKeyAttr.Range()).
-									WithAttributeAnnotation(kmsKeyAttr).
-									WithSeverity(severity.Info),
-							)
-						}
-					}
-
+				keyIdAttr := kmsData.GetAttribute("key_id")
+				if keyIdAttr != nil && keyIdAttr.Equals("alias/aws/secretsmanager") {
+					set.Add(
+						result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("Resource '%s' explicitly uses the default CMK", resourceBlock.FullName())).
+							WithRange(kmsKeyAttr.Range()).
+							WithAttributeAnnotation(kmsKeyAttr),
+					)
 				}
 			}
 

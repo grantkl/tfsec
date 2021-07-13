@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSRDSRetentionPeriod = "AWS091"
@@ -91,32 +91,31 @@ func init() {
 				"https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithAutomatedBackups.html#USER_WorkingWithAutomatedBackups.BackupRetention",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_rds_cluster", "aws_db_instance"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
-			if block.HasChild("replicate_source_db") {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_rds_cluster", "aws_db_instance"},
+		DefaultSeverity: severity.Medium,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
+			if resourceBlock.HasChild("replicate_source_db") {
 				return
 			}
 
-			if block.MissingChild("backup_retention_period") {
+			if resourceBlock.MissingChild("backup_retention_period") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' does not have backup retention explicitly set", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Info),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' does not have backup retention explicitly set", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
 				return
 			}
 
-			retentionAttr := block.GetAttribute("backup_retention_period")
+			retentionAttr := resourceBlock.GetAttribute("backup_retention_period")
 			if retentionAttr.LessThanOrEqualTo(1) {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' has backup retention period set to a low value", block.FullName())).
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' has backup retention period set to a low value", resourceBlock.FullName())).
 						WithRange(retentionAttr.Range()).
-						WithAttributeAnnotation(retentionAttr).
-						WithSeverity(severity.Info),
+						WithAttributeAnnotation(retentionAttr),
 				)
 			}
 

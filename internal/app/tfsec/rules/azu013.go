@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AZUTrustedMicrosoftServicesHaveStroageAccountAccess = "AZU013"
@@ -105,25 +105,26 @@ func init() {
 				"https://docs.microsoft.com/en-us/azure/storage/common/storage-network-security#trusted-microsoft-services",
 			},
 		},
-		Provider:       provider.AzureProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"azurerm_storage_account_network_rules", "azurerm_storage_account"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AzureProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"azurerm_storage_account_network_rules", "azurerm_storage_account"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if block.IsResourceType("azurerm_storage_account") {
-				if block.MissingChild("network_rules") {
+			if resourceBlock.IsResourceType("azurerm_storage_account") {
+				if resourceBlock.MissingChild("network_rules") {
+					return
 				}
-				block = block.GetBlock("network_rules")
+				resourceBlock = resourceBlock.GetBlock("network_rules")
 			}
 
-			if block.HasChild("bypass") {
-				bypass := block.GetAttribute("bypass")
-				if !bypass.Contains("AzureServices") {
+			if resourceBlock.HasChild("bypass") {
+				bypass := resourceBlock.GetAttribute("bypass")
+				if bypass != nil && !bypass.Contains("AzureServices") {
 					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' defines a network rule that doesn't allow bypass of Microsoft Services.", block.FullName())).
-							WithRange(block.Range()).
-							WithSeverity(severity.Error),
+						result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("Resource '%s' defines a network rule that doesn't allow bypass of Microsoft Services.", resourceBlock.FullName())).
+							WithRange(resourceBlock.Range()),
 					)
 				}
 			}

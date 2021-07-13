@@ -3,12 +3,13 @@ package main
 const checkTemplate = `package rules
 
 import (
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
-	"github.com/tfsec/tfsec/pkg/provider"
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 )
 
 
@@ -43,11 +44,11 @@ func init() {
 		Provider:       provider.{{.ProviderLongName}}Provider,
 		RequiredTypes:  []string{{.RequiredTypes}},
 		RequiredLabels: []string{{.RequiredLabels}},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context){
+		DefaultSeverity: severity.Warning, 
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context){
 				
 			// function contents here
 
-			return
 		},
 	})
 }
@@ -58,7 +59,7 @@ const checkTestTemplate = `package test
 import (
 	"testing"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/rules"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/rules"
 )
 
 func Test_{{.CheckName}}(t *testing.T) {
@@ -87,7 +88,7 @@ func Test_{{.CheckName}}(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			results := scanSource(test.source)
+			results := scanHCL(test.source, t)
 			assertCheckCode(t, test.mustIncludeResultCode, test.mustExcludeResultCode, results)
 		})
 	}

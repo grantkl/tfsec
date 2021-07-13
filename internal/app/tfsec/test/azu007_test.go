@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/rules"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/rules"
 )
 
 func Test_AZUAKSClusterRBACenabled(t *testing.T) {
@@ -46,7 +46,7 @@ resource "azurerm_kubernetes_cluster" "my-aks-cluster" {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			results := scanSource(test.source)
+			results := scanHCL(test.source, t)
 			assertCheckCode(t, test.mustIncludeResultCode, test.mustExcludeResultCode, results)
 		})
 	}

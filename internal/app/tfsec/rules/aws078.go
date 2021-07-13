@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSEcrImagesHaveImmutableTags = "AWS078"
@@ -62,29 +62,28 @@ func init() {
 				"https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/ecr_repository",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_ecr_repository"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_ecr_repository"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			imageTagMutabilityAttr := block.GetAttribute("image_tag_mutability")
+			imageTagMutabilityAttr := resourceBlock.GetAttribute("image_tag_mutability")
 			if imageTagMutabilityAttr == nil {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' is missing `image_tag_mutability` attribute - it is required to make ecr image tag immutable.", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' is missing `image_tag_mutability` attribute - it is required to make ecr image tag immutable.", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
 				return
 			}
 
 			if !imageTagMutabilityAttr.Equals("IMMUTABLE") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' has `image_tag_mutability` attribute  not set to `IMMUTABLE`", block.FullName())).
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' has `image_tag_mutability` attribute  not set to `IMMUTABLE`", resourceBlock.FullName())).
 						WithRange(imageTagMutabilityAttr.Range()).
-						WithAttributeAnnotation(imageTagMutabilityAttr).
-						WithSeverity(severity.Error),
+						WithAttributeAnnotation(imageTagMutabilityAttr),
 				)
 			}
 

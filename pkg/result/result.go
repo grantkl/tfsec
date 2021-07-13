@@ -2,12 +2,13 @@ package result
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/zclconf/go-cty/cty"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
-	"github.com/tfsec/tfsec/pkg/provider"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 )
 
 // Result is a positive result for a security check. It encapsulates a code unique to the specific check it was raised
@@ -24,6 +25,7 @@ type Result struct {
 	RangeAnnotation string            `json:"-"`
 	Severity        severity.Severity `json:"severity"`
 	Status          Status            `json:"status"`
+	topLevelBlock   block.Block
 }
 
 type Status string
@@ -34,9 +36,10 @@ const (
 	Ignored Status = "ignored"
 )
 
-func New() *Result {
+func New(resourceBlock block.Block) *Result {
 	return &Result{
-		Status: Failed,
+		Status:        Failed,
+		topLevelBlock: resourceBlock,
 	}
 }
 
@@ -103,26 +106,46 @@ func (r *Result) WithStatus(status Status) *Result {
 	return r
 }
 
-func (r *Result) WithAttributeAnnotation(attr *block.Attribute) *Result {
+func (r *Result) WithAttributeAnnotation(attr block.Attribute) *Result {
 
-	var raw interface{}
+	var raw string
 
 	var typeStr string
 
-	switch attr.Type() {
+	typ := attr.Type()
+
+	switch typ {
 	case cty.String:
-		raw = attr.Value().AsString()
+		raw = fmt.Sprintf("%q", attr.Value().AsString())
 		typeStr = "string"
 	case cty.Bool:
-		raw = attr.Value().True()
+		raw = fmt.Sprintf("%t", attr.Value().True())
 		typeStr = "bool"
 	case cty.Number:
-		raw, _ = attr.Value().AsBigFloat().Float64()
+		float, _ := attr.Value().AsBigFloat().Float64()
+		raw = fmt.Sprintf("%f", float)
 		typeStr = "number"
 	default:
-		return r
+		switch true {
+		case typ.IsTupleType(), typ.IsListType():
+			values := attr.Value().AsValueSlice()
+			var strValues []string
+			for _, value := range values {
+				switch value.Type() {
+				case cty.String:
+					strValues = append(strValues, fmt.Sprintf("%q", value.AsString()))
+				case cty.Number:
+					strValues = append(strValues, fmt.Sprintf(`%f`, value.AsBigFloat()))
+				case cty.Bool:
+					strValues = append(strValues, fmt.Sprintf(`%t`, value.True()))
+				}
+
+			}
+			typeStr = "list"
+			raw = fmt.Sprintf("[%s]", strings.Join(strValues, ", "))
+		}
 	}
 
-	r.RangeAnnotation = fmt.Sprintf("[%s] %#v", typeStr, raw)
+	r.RangeAnnotation = fmt.Sprintf("%s: %s", typeStr, raw)
 	return r
 }

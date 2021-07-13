@@ -1,6 +1,6 @@
 package result
 
-import "github.com/tfsec/tfsec/pkg/provider"
+import "github.com/aquasecurity/tfsec/pkg/provider"
 
 type Set interface {
 	Add(result *Result)
@@ -33,7 +33,13 @@ func (s *resultSet) Add(result *Result) {
 		WithRuleSummary(s.ruleSummary).
 		WithImpact(s.impact).
 		WithResolution(s.resolution).
-		WithRuleProvider(s.ruleProvider)
+		WithRuleProvider(s.ruleProvider).
+		WithLinks(s.links)
+
+	if result.Range.Filename == "" {
+		result.Range = result.topLevelBlock.Range()
+	}
+
 	s.results = append(s.results, *result)
 }
 

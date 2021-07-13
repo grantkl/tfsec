@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AZUAKSAPIServerAuthorizedIPRanges = "AZU008"
@@ -52,21 +52,21 @@ func init() {
 				"https://www.terraform.io/docs/providers/azurerm/r/kubernetes_cluster.html#api_server_authorized_ip_ranges",
 			},
 		},
-		Provider:       provider.AzureProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"azurerm_kubernetes_cluster"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AzureProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"azurerm_kubernetes_cluster"},
+		DefaultSeverity: severity.Critical,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if (block.MissingChild("api_server_authorized_ip_ranges") ||
-				block.GetAttribute("api_server_authorized_ip_ranges").Value().LengthInt() < 1) &&
-				(block.MissingChild("private_cluster_enabled") ||
-					block.GetAttribute("private_cluster_enabled").IsFalse()) {
+			if (resourceBlock.MissingChild("api_server_authorized_ip_ranges") ||
+				resourceBlock.GetAttribute("api_server_authorized_ip_ranges").Value().LengthInt() < 1) &&
+				(resourceBlock.MissingChild("private_cluster_enabled") ||
+					resourceBlock.GetAttribute("private_cluster_enabled").IsFalse()) {
 				{
 					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' defined without limited set of IP address ranges to the API server.", block.FullName())).
-							WithRange(block.Range()).
-							WithSeverity(severity.Error),
+						result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("Resource '%s' defined without limited set of IP address ranges to the API server.", resourceBlock.FullName())).
+							WithRange(resourceBlock.Range()),
 					)
 				}
 			}

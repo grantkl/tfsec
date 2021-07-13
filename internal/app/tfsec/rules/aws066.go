@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSEKSSecretsEncryptionEnabled = "AWS066"
@@ -66,28 +66,27 @@ func init() {
 				"https://aws.amazon.com/about-aws/whats-new/2020/03/amazon-eks-adds-envelope-encryption-for-secrets-with-aws-kms/",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_eks_cluster"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_eks_cluster"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if block.MissingChild("encryption_config") {
+			if resourceBlock.MissingChild("encryption_config") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' has no encryptionConfigBlock block", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' has no encryptionConfigBlock block", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
 				return
 			}
 
-			encryptionConfigBlock := block.GetBlock("encryption_config")
+			encryptionConfigBlock := resourceBlock.GetBlock("encryption_config")
 			if encryptionConfigBlock.MissingChild("resources") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' has encryptionConfigBlock block with no resourcesAttr attribute specified", block.FullName())).
-						WithRange(encryptionConfigBlock.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' has encryptionConfigBlock block with no resourcesAttr attribute specified", resourceBlock.FullName())).
+						WithRange(encryptionConfigBlock.Range()),
 				)
 				return
 			}
@@ -95,20 +94,18 @@ func init() {
 			resourcesAttr := encryptionConfigBlock.GetAttribute("resources")
 			if !resourcesAttr.Contains("secrets") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' does not include secrets in encrypted resources", block.FullName())).
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' does not include secrets in encrypted resources", resourceBlock.FullName())).
 						WithRange(resourcesAttr.Range()).
-						WithAttributeAnnotation(resourcesAttr).
-						WithSeverity(severity.Error),
+						WithAttributeAnnotation(resourcesAttr),
 				)
 			}
 
 			if encryptionConfigBlock.MissingChild("provider") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' has encryptionConfigBlock block with no provider block specified", block.FullName())).
-						WithRange(encryptionConfigBlock.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' has encryptionConfigBlock block with no provider block specified", resourceBlock.FullName())).
+						WithRange(encryptionConfigBlock.Range()),
 				)
 				return
 			}
@@ -116,10 +113,9 @@ func init() {
 			providerBlock := encryptionConfigBlock.GetBlock("provider")
 			if providerBlock.MissingChild("key_arn") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' has encryptionConfigBlock block with provider block specified missing key arn", block.FullName())).
-						WithRange(encryptionConfigBlock.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' has encryptionConfigBlock block with provider block specified missing key arn", resourceBlock.FullName())).
+						WithRange(encryptionConfigBlock.Range()),
 				)
 				return
 			}
@@ -127,11 +123,10 @@ func init() {
 			keyArnAttr := providerBlock.GetAttribute("key_arn")
 			if keyArnAttr.IsEmpty() {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' has encryptionConfigBlock block with provider block specified but key_arn is empty", block.FullName())).
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' has encryptionConfigBlock block with provider block specified but key_arn is empty", resourceBlock.FullName())).
 						WithRange(keyArnAttr.Range()).
-						WithAttributeAnnotation(keyArnAttr).
-						WithSeverity(severity.Error),
+						WithAttributeAnnotation(keyArnAttr),
 				)
 			}
 

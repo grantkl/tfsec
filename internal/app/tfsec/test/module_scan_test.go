@@ -3,8 +3,8 @@ package test
 import (
 	"testing"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/parser"
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/parser"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 func Test_ProblemInModule(t *testing.T) {
@@ -39,7 +39,7 @@ resource "problem" "uhoh" {
 			if err != nil {
 				t.Fatal(err)
 			}
-			results := scanner.New(scanner.OptionExcludeRules(excludedChecksList)).Scan(blocks)
+			results := scanner.New(scanner.OptionExcludeRules(excludedChecksList), scanner.OptionIgnoreCheckErrors(false)).Scan(blocks)
 			assertCheckCode(t, test.mustIncludeResultCode, test.mustExcludeResultCode, results)
 		})
 	}

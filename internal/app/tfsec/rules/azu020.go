@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AZUKeyVaultNetworkAcl = "AZU020"
@@ -65,38 +65,36 @@ func init() {
 				"https://docs.microsoft.com/en-us/azure/key-vault/general/network-security",
 			},
 		},
-		Provider:       provider.AzureProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"azurerm_key_vault"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AzureProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"azurerm_key_vault"},
+		DefaultSeverity: severity.Critical,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if block.MissingChild("network_acls") {
+			if resourceBlock.MissingChild("network_acls") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' specifies does not specify a network acl block.", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' specifies does not specify a network acl block.", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
 				return
 			}
 
-			networkAcls := block.GetBlock("network_acls")
+			networkAcls := resourceBlock.GetBlock("network_acls")
 			if networkAcls == nil {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' specifies does not specify a network acl block.", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' specifies does not specify a network acl block.", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
 				return
 			}
 
 			if networkAcls.MissingChild("default_action") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' specifies does not specify a default action in the network acl.", block.FullName())).
-						WithRange(networkAcls.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' specifies does not specify a default action in the network acl.", resourceBlock.FullName())).
+						WithRange(networkAcls.Range()),
 				)
 				return
 			}
@@ -104,11 +102,10 @@ func init() {
 			defaultActionAttr := networkAcls.GetAttribute("default_action")
 			if !defaultActionAttr.Equals("Deny") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' specifies does not specify a network acl block.", block.FullName())).
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' specifies does not specify a network acl block.", resourceBlock.FullName())).
 						WithRange(defaultActionAttr.Range()).
-						WithAttributeAnnotation(defaultActionAttr).
-						WithSeverity(severity.Error),
+						WithAttributeAnnotation(defaultActionAttr),
 				)
 			}
 

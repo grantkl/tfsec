@@ -4,18 +4,18 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSEnsureAthenaDbEncrypted = "AWS059"
@@ -91,28 +91,30 @@ func init() {
 				"https://docs.aws.amazon.com/athena/latest/ug/encryption.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_athena_database", "aws_athena_workgroup"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_athena_database", "aws_athena_workgroup"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			blockName := block.FullName()
+			blockName := resourceBlock.FullName()
 
-			if strings.EqualFold(block.TypeLabel(), "aws_athena_workgroup") {
-				if block.HasChild("configuration") && block.GetBlock("configuration").
-					HasChild("result_configuration") {
-					block = block.GetBlock("configuration").GetBlock("result_configuration")
-				} else {
+			if strings.EqualFold(resourceBlock.TypeLabel(), "aws_athena_workgroup") {
+				if !resourceBlock.HasChild("configuration") {
 					return
 				}
+				configBlock := resourceBlock.GetBlock("configuration")
+				if !configBlock.HasChild("result_configuration") {
+					return
+				}
+				resourceBlock = configBlock.GetBlock("result_configuration")
 			}
 
-			if block.MissingChild("encryption_configuration") {
+			if resourceBlock.MissingChild("encryption_configuration") {
 				set.Add(
-					result.New().
+					result.New(resourceBlock).
 						WithDescription(fmt.Sprintf("Resource '%s' missing encryption configuration block.", blockName)).
-						WithRange(block.Range()).
-						WithSeverity(severity.Error),
+						WithRange(resourceBlock.Range()),
 				)
 			}
 

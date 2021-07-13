@@ -3,23 +3,22 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
 	"github.com/zclconf/go-cty/cty"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
-// AWSNoKMSAutoRotate See https://github.com/tfsec/tfsec#included-checks for check info
 const AWSNoKMSAutoRotate = "AWS019"
 const AWSNoKMSAutoRotateDescription = "A KMS key is not configured to auto-rotate."
 const AWSNoKMSAutoRotateImpact = "Long life KMS keys increase the attack surface when compromised"
@@ -53,35 +52,34 @@ func init() {
 				"https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_kms_key"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
-			keyUsageAttr := block.GetAttribute("key_usage")
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_kms_key"},
+		DefaultSeverity: severity.Medium,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
+			keyUsageAttr := resourceBlock.GetAttribute("key_usage")
 
 			if keyUsageAttr != nil && keyUsageAttr.Equals("SIGN_VERIFY") {
 				return
 			}
 
-			keyRotationAttr := block.GetAttribute("enable_key_rotation")
+			keyRotationAttr := resourceBlock.GetAttribute("enable_key_rotation")
 
 			if keyRotationAttr == nil {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' does not have KMS Key auto-rotation enabled.", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Warning),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' does not have KMS Key auto-rotation enabled.", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
 				return
 			}
 
 			if keyRotationAttr.Type() == cty.Bool && keyRotationAttr.Value().False() {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' does not have KMS Key auto-rotation enabled.", block.FullName())).
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' does not have KMS Key auto-rotation enabled.", resourceBlock.FullName())).
 						WithRange(keyRotationAttr.Range()).
-						WithAttributeAnnotation(keyRotationAttr).
-						WithSeverity(severity.Warning),
+						WithAttributeAnnotation(keyRotationAttr),
 				)
 			}
 

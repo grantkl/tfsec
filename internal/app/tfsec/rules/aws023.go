@@ -3,23 +3,22 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
 	"github.com/zclconf/go-cty/cty"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
-// AWSEcrImageScanNotEnabled See https://github.com/tfsec/tfsec#included-checks for check info
 const AWSEcrImageScanNotEnabled = "AWS023"
 const AWSEcrImageScanNotEnabledDescription = "ECR repository has image scans disabled."
 const AWSEcrImageScanNotEnabledImpact = "The ability to scan images is not being used and vulnerabilities will not be highlighted"
@@ -63,28 +62,36 @@ func init() {
 				"https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_ecr_repository"},
-		CheckFunc: func(set result.Set, block *block.Block, context *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_ecr_repository"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, context *hclcontext.Context) {
 
-			ecrScanStatusBlock := block.GetBlock("image_scanning_configuration")
+			if resourceBlock.MissingChild("image_scanning_configuration") {
+				set.Add(
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' defines a disabled ECR image scan.", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
+				)
+				return
+			}
+
+			ecrScanStatusBlock := resourceBlock.GetBlock("image_scanning_configuration")
 			ecrScanStatusAttr := ecrScanStatusBlock.GetAttribute("scan_on_push")
 
 			if ecrScanStatusAttr == nil {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' defines a disabled ECR image scan.", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' defines a disabled ECR image scan.", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
 			} else if ecrScanStatusAttr.Type() == cty.Bool && ecrScanStatusAttr.Value().False() {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' defines a disabled ECR image scan.", block.FullName())).
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' defines a disabled ECR image scan.", resourceBlock.FullName())).
 						WithRange(ecrScanStatusAttr.Range()).
-						WithAttributeAnnotation(ecrScanStatusAttr).
-						WithSeverity(severity.Error),
+						WithAttributeAnnotation(ecrScanStatusAttr),
 				)
 			}
 		},

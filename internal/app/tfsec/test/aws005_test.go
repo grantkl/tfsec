@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/rules"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/rules"
 )
 
 func Test_AWSNotInternal(t *testing.T) {
@@ -53,11 +53,21 @@ resource "aws_lb" "my-resource" {
 }`,
 			mustExcludeResultCode: rules.AWSExternallyExposedLoadBalancer,
 		},
+		{
+			name: "check aws_lb when explicitly is a gateway",
+			source: `
+resource "aws_lb" "gwlb" {
+	name               = var.gwlb_name
+	load_balancer_type = "gateway"
+	subnets            = local.appliance_subnets_id
+  }`,
+			mustExcludeResultCode: rules.AWSExternallyExposedLoadBalancer,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			results := scanSource(test.source)
+			results := scanHCL(test.source, t)
 			assertCheckCode(t, test.mustIncludeResultCode, test.mustExcludeResultCode, results)
 		})
 	}

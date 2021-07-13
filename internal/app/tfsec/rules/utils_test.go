@@ -3,9 +3,9 @@ package rules
 import (
 	"testing"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
 	hcl "github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
@@ -45,8 +45,8 @@ func Test_isBooleanOrStringTrue(t *testing.T) {
 
 	for _, test := range tests {
 		expr, _ := hclsyntax.ParseExpression([]byte(test.rawExpr), "", hcl.Pos{Line: 0, Column: 0, Byte: 0})
-		attr := block.NewAttribute(
-			&hclsyntax.Attribute{
+		attr := block.NewHCLAttribute(
+			&hcl.Attribute{
 				Expr: expr,
 			},
 			nil,
@@ -157,8 +157,8 @@ func Test_isOpenCidr(t *testing.T) {
 
 	for _, test := range tests {
 		expr, _ := hclsyntax.ParseExpression([]byte(test.rawExpr), "", hcl.Pos{Line: 0, Column: 0, Byte: 0})
-		attr := block.NewAttribute(
-			&hclsyntax.Attribute{
+		attr := block.NewHCLAttribute(
+			&hcl.Attribute{
 				Expr: expr,
 			},
 			nil,

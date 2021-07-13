@@ -3,25 +3,24 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
-
-	"github.com/tfsec/tfsec/pkg/provider"
-
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
-
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
-
-	"github.com/tfsec/tfsec/pkg/rule"
-
-	"github.com/tfsec/tfsec/internal/app/tfsec/security"
-
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
-
 	"github.com/zclconf/go-cty/cty"
+
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
+
+	"github.com/aquasecurity/tfsec/pkg/provider"
+
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
+
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
+
+	"github.com/aquasecurity/tfsec/pkg/rule"
+
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/security"
+
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
-// GenericSensitiveVariables See https://github.com/tfsec/tfsec#included-checks for check info
 const GenericSensitiveVariables = "GEN001"
 const GenericSensitiveVariablesDescription = "Potentially sensitive data stored in \"default\" value of variable."
 const GenericSensitiveVariablesImpact = "Default values could be exposing sensitive data"
@@ -67,26 +66,22 @@ func init() {
 				"https://www.terraform.io/docs/state/sensitive-data.html",
 			},
 		},
-		Provider:      provider.GeneralProvider,
-		RequiredTypes: []string{"variable"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.GeneralProvider,
+		RequiredTypes:   []string{"variable"},
+		DefaultSeverity: severity.Critical,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if len(block.Labels()) == 0 || !security.IsSensitiveAttribute(block.TypeLabel()) {
+			if len(resourceBlock.Labels()) == 0 || !security.IsSensitiveAttribute(resourceBlock.TypeLabel()) {
 				return
 			}
 
-			for _, attribute := range block.GetAttributes() {
+			for _, attribute := range resourceBlock.GetAttributes() {
 				if attribute.Name() == "default" {
-					val := attribute.Value()
-					if val.Type() != cty.String {
-						continue
-					}
-					if val.AsString() != "" {
-						set.Add(result.New().
-							WithDescription(fmt.Sprintf("Variable '%s' includes a potentially sensitive default value.", block.FullName())).
+					if attribute.Type() == cty.String && attribute.IsResolvable() {
+						set.Add(result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("Variable '%s' includes a potentially sensitive default value.", resourceBlock.FullName())).
 							WithRange(attribute.Range()).
-							WithAttributeAnnotation(attribute).
-							WithSeverity(severity.Warning),
+							WithAttributeAnnotation(attribute),
 						)
 					}
 				}

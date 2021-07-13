@@ -3,20 +3,20 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
 	"github.com/zclconf/go-cty/cty"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const (
@@ -58,24 +58,23 @@ func init() {
 				"https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_account_password_policy",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_iam_account_password_policy"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
-			if attr := block.GetAttribute("require_symbols"); attr == nil {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_iam_account_password_policy"},
+		DefaultSeverity: severity.Medium,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
+			if attr := resourceBlock.GetAttribute("require_symbols"); attr == nil {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' does not require a symbol in the password.", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Warning),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' does not require a symbol in the password.", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
 			} else if attr.Value().Type() == cty.Bool {
 				if attr.Value().False() {
 					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' explicitly specifies not requiring at least one symbol in the password.", block.FullName())).
-							WithRange(block.Range()).
-							WithSeverity(severity.Warning),
+						result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("Resource '%s' explicitly specifies not requiring at least one symbol in the password.", resourceBlock.FullName())).
+							WithRange(resourceBlock.Range()),
 					)
 				}
 			}

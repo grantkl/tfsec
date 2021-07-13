@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSEC2InstanceSensitiveUserdata = "AWS062"
@@ -69,34 +69,34 @@ func init() {
 				"https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-add-user-data.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_instance"},
-		CheckFunc: func(set result.Set, resourceBlock *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_instance"},
+		DefaultSeverity: severity.Critical,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
 			if resourceBlock.MissingChild("user_data") {
+				return
 			}
 
 			userDataAttr := resourceBlock.GetAttribute("user_data")
 			if userDataAttr.Contains("AWS_ACCESS_KEY_ID", block.IgnoreCase) &&
 				userDataAttr.RegexMatches("(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}") {
 				set.Add(
-					result.New().
+					result.New(resourceBlock).
 						WithDescription(fmt.Sprintf("Resource '%s' has userdata with access key id defined.", resourceBlock.FullName())).
 						WithRange(userDataAttr.Range()).
-						WithAttributeAnnotation(userDataAttr).
-						WithSeverity(severity.Error),
+						WithAttributeAnnotation(userDataAttr),
 				)
 			}
 
 			if userDataAttr.Contains("AWS_SECRET_ACCESS_KEY", block.IgnoreCase) &&
 				userDataAttr.RegexMatches("(?i)aws_secre.+[=:]\\s{0,}[A-Za-z0-9\\/+=]{40}.?") {
 				set.Add(
-					result.New().
+					result.New(resourceBlock).
 						WithDescription(fmt.Sprintf("Resource '%s' has userdata with access secret key defined.", resourceBlock.FullName())).
 						WithRange(userDataAttr.Range()).
-						WithAttributeAnnotation(userDataAttr).
-						WithSeverity(severity.Error),
+						WithAttributeAnnotation(userDataAttr),
 				)
 			}
 		},

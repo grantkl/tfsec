@@ -3,25 +3,25 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
 	"github.com/zclconf/go-cty/cty"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AZUBlobStorageContainerNoPublicAccess = "AZU011"
 const AZUBlobStorageContainerNoPublicAccessDescription = "Storage containers in blob storage mode should not have public access"
-const AZUBlobStorageContainerNoPublicAccessImpact = "Data in the storage container could be exposed publically"
+const AZUBlobStorageContainerNoPublicAccessImpact = "Data in the storage container could be exposed publicly"
 const AZUBlobStorageContainerNoPublicAccessResolution = "Disable public access to storage containers"
 const AZUBlobStorageContainerNoPublicAccessExplanation = `
 Storage container public access should be off. It can be configured for blobs only, containers and blobs or off entirely. The default is off, with no public access.
@@ -64,22 +64,22 @@ func init() {
 				"https://docs.microsoft.com/en-us/azure/storage/blobs/anonymous-read-access-configure?tabs=portal#set-the-public-access-level-for-a-container",
 			},
 		},
-		Provider:       provider.AzureProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"azure_storage_container"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AzureProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"azure_storage_container"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
 			// function contents here
-			if block.HasChild("properties") {
-				properties := block.GetAttribute("properties")
-				if properties.Contains("publicAccess") {
+			if resourceBlock.HasChild("properties") {
+				properties := resourceBlock.GetAttribute("properties")
+				if properties != nil && properties.Contains("publicAccess") {
 					value := properties.MapValue("publicAccess")
 					if value == cty.StringVal("blob") || value == cty.StringVal("container") {
 						set.Add(
-							result.New().
-								WithDescription(fmt.Sprintf("Resource '%s' defines publicAccess as '%s', should be 'off .", block.FullName(), value)).
-								WithRange(block.Range()).
-								WithSeverity(severity.Error),
+							result.New(resourceBlock).
+								WithDescription(fmt.Sprintf("Resource '%s' defines publicAccess as '%s', should be 'off .", resourceBlock.FullName(), value)).
+								WithRange(resourceBlock.Range()),
 						)
 					}
 				}

@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSDAXEncryptedAtRest = "AWS081"
@@ -71,36 +71,34 @@ func init() {
 				"https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/dax_cluster#server_side_encryption",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_dax_cluster"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_dax_cluster"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if block.MissingChild("server_side_encryption") {
-				res := result.New().
-					WithDescription(fmt.Sprintf("DAX cluster '%s' does not have server side encryption configured. By default it is disabled.", block.FullName())).
-					WithRange(block.Range()).
-					WithSeverity(severity.Error)
+			if resourceBlock.MissingChild("server_side_encryption") {
+				res := result.New(resourceBlock).
+					WithDescription(fmt.Sprintf("DAX cluster '%s' does not have server side encryption configured. By default it is disabled.", resourceBlock.FullName())).
+					WithRange(resourceBlock.Range())
 				set.Add(res)
 				return
 			}
 
-			sseBlock := block.GetBlock("server_side_encryption")
+			sseBlock := resourceBlock.GetBlock("server_side_encryption")
 			if sseBlock.MissingChild("enabled") {
-				res := result.New().
-					WithDescription(fmt.Sprintf("DAX cluster '%s' server side encryption block is empty. By default SSE is disabled.", block.FullName())).
-					WithRange(sseBlock.Range()).
-					WithSeverity(severity.Error)
+				res := result.New(resourceBlock).
+					WithDescription(fmt.Sprintf("DAX cluster '%s' server side encryption block is empty. By default SSE is disabled.", resourceBlock.FullName())).
+					WithRange(sseBlock.Range())
 				set.Add(res)
 				return
 			}
 
 			if sseEnabledAttr := sseBlock.GetAttribute("enabled"); sseEnabledAttr.IsFalse() {
-				res := result.New().
-					WithDescription(fmt.Sprintf("DAX cluster '%s' has disabled server side encryption", block.FullName())).
+				res := result.New(resourceBlock).
+					WithDescription(fmt.Sprintf("DAX cluster '%s' has disabled server side encryption", resourceBlock.FullName())).
 					WithRange(sseEnabledAttr.Range()).
-					WithAttributeAnnotation(sseEnabledAttr).
-					WithSeverity(severity.Error)
+					WithAttributeAnnotation(sseEnabledAttr)
 				set.Add(res)
 			}
 

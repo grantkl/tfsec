@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSBlockPublicPolicyS3 = "AWS076"
@@ -22,7 +22,7 @@ const AWSBlockPublicPolicyS3Description = "S3 Access block should block public p
 const AWSBlockPublicPolicyS3Impact = "Users could put a policy that allows public access"
 const AWSBlockPublicPolicyS3Resolution = "Prevent policies that allow public access being PUT"
 const AWSBlockPublicPolicyS3Explanation = `
-S3 bucket policy should have block public policy to prevent users from PUTing a policy that enable public access.
+S3 bucket policy should have block public policy to prevent users from putting a policy that enable public access.
 `
 const AWSBlockPublicPolicyS3BadExample = `
 resource "aws_s3_bucket_public_access_block" "bad_example" {
@@ -58,27 +58,27 @@ func init() {
 				"https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_public_access_block#block_public_policy",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_s3_bucket_public_access_block"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
-			if block.MissingChild("block_public_policy") {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_s3_bucket_public_access_block"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
+			if resourceBlock.MissingChild("block_public_policy") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' does not specify block_public_policy, defaults to false", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' does not specify block_public_policy, defaults to false", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
+				return
 			}
 
-			attr := block.GetAttribute("block_public_policy")
+			attr := resourceBlock.GetAttribute("block_public_policy")
 			if attr.IsFalse() {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' sets block_public_policy explicitly to false", block.FullName())).
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' sets block_public_policy explicitly to false", resourceBlock.FullName())).
 						WithRange(attr.Range()).
-						WithAttributeAnnotation(attr).
-						WithSeverity(severity.Error),
+						WithAttributeAnnotation(attr),
 				)
 			}
 		},

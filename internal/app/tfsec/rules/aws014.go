@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 
 	"github.com/zclconf/go-cty/cty"
 )
@@ -24,7 +24,7 @@ const AWSLaunchConfigurationWithUnencryptedBlockDeviceDescription = "Launch conf
 const AWSLaunchConfigurationWithUnencryptedBlockDeviceImpact = "The block device is could be compromised and read from"
 const AWSLaunchConfigurationWithUnencryptedBlockDeviceResolution = "Turn on encryption for all block devices"
 const AWSLaunchConfigurationWithUnencryptedBlockDeviceExplanation = `
-Blocks devices should be encrypted to ensure sensitive data is hel securely at rest.
+Blocks devices should be encrypted to ensure sensitive data is held securely at rest.
 `
 const AWSLaunchConfigurationWithUnencryptedBlockDeviceBadExample = `
 resource "aws_launch_configuration" "bad_example" {
@@ -56,10 +56,11 @@ func init() {
 				"https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/RootDeviceStorage.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_launch_configuration"},
-		CheckFunc: func(set result.Set, block *block.Block, context *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_launch_configuration"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, context *hclcontext.Context) {
 
 			var encryptionByDefault bool
 
@@ -70,55 +71,40 @@ func init() {
 				}
 			}
 
-			rootDeviceBlock := block.GetBlock("root_block_device")
+			rootDeviceBlock := resourceBlock.GetBlock("root_block_device")
 			if rootDeviceBlock == nil && !encryptionByDefault {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' uses an unencrypted root EBS block device. Consider adding <blue>root_block_device{ encrypted = true }</blue>", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' uses an unencrypted root EBS block device. Consider adding <blue>root_block_device{ encrypted = true }</blue>", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
 			} else if rootDeviceBlock != nil {
-				encryptedAttr := rootDeviceBlock.GetAttribute("encrypted")
-				if encryptedAttr == nil && !encryptionByDefault {
-					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' uses an unencrypted root EBS block device. Consider adding <blue>encrypted = true</blue>", block.FullName())).
-							WithRange(rootDeviceBlock.Range()).
-							WithSeverity(severity.Error),
-					)
-				} else if encryptedAttr != nil && encryptedAttr.Type() == cty.Bool && encryptedAttr.Value().False() {
-					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' uses an unencrypted root EBS block device.", block.FullName())).
-							WithRange(encryptedAttr.Range()).
-							WithAttributeAnnotation(encryptedAttr).
-							WithSeverity(severity.Error),
-					)
-				}
+				checkDeviceEncryption(rootDeviceBlock, encryptionByDefault, set, resourceBlock)
 			}
 
-			ebsDeviceBlocks := block.GetBlocks("ebs_block_device")
+			ebsDeviceBlocks := resourceBlock.GetBlocks("ebs_block_device")
 			for _, ebsDeviceBlock := range ebsDeviceBlocks {
-				encryptedAttr := ebsDeviceBlock.GetAttribute("encrypted")
-				if encryptedAttr == nil && !encryptionByDefault {
-					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' uses an unencrypted EBS block device. Consider adding <blue>encrypted = true</blue>", block.FullName())).
-							WithRange(ebsDeviceBlock.Range()).
-							WithSeverity(severity.Error),
-					)
-				} else if encryptedAttr != nil && encryptedAttr.Type() == cty.Bool && encryptedAttr.Value().False() {
-					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' uses an unencrypted EBS block device.", block.FullName())).
-							WithRange(encryptedAttr.Range()).
-							WithAttributeAnnotation(encryptedAttr).
-							WithSeverity(severity.Error),
-					)
-				}
+				checkDeviceEncryption(ebsDeviceBlock, encryptionByDefault, set, resourceBlock)
 			}
 
 		},
 	})
+}
+
+func checkDeviceEncryption(deviceBlock block.Block, encryptionByDefault bool, set result.Set, resourceBlock block.Block) {
+	encryptedAttr := deviceBlock.GetAttribute("encrypted")
+	if encryptedAttr == nil && !encryptionByDefault {
+		set.Add(
+			result.New(resourceBlock).
+				WithDescription(fmt.Sprintf("Resource '%s' uses an unencrypted EBS block device. Consider adding <blue>encrypted = true</blue>", resourceBlock.FullName())).
+				WithRange(deviceBlock.Range()),
+		)
+	} else if encryptedAttr != nil && encryptedAttr.Type() == cty.Bool && encryptedAttr.Value().False() {
+		set.Add(
+			result.New(resourceBlock).
+				WithDescription(fmt.Sprintf("Resource '%s' uses an unencrypted root EBS block device.", resourceBlock.FullName())).
+				WithRange(encryptedAttr.Range()).
+				WithAttributeAnnotation(encryptedAttr),
+		)
+	}
 }

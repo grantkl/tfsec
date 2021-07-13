@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/rules"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/rules"
 )
 
 func Test_AWSSensitiveVariables(t *testing.T) {
@@ -23,10 +23,10 @@ variable "db_password" {
 			mustIncludeResultCode: rules.GenericSensitiveVariables,
 		},
 		{
-			name: "check sensitive variable without value",
+			name: "check sensitive variable without default",
 			source: `
 variable "db_password" {
-	default = ""
+
 }`,
 			mustExcludeResultCode: rules.GenericSensitiveVariables,
 		},
@@ -34,7 +34,7 @@ variable "db_password" {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			results := scanSource(test.source)
+			results := scanHCL(test.source, t)
 			assertCheckCode(t, test.mustIncludeResultCode, test.mustExcludeResultCode, results)
 		})
 	}

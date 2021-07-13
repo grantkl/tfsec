@@ -8,7 +8,7 @@ builds:
     main: ./cmd/tfsec
     binary: tfsec
     ldflags:
-    - "-X github.com/tfsec/tfsec/version.Version={{.Version}} -s -w -extldflags '-fno-PIC -static'"
+    - "-X github.com/aquasecurity/tfsec/version.Version={{.Version}} -s -w -extldflags '-fno-PIC -static'"
     env:
       - CGO_ENABLED=0
       - GOFLAGS=-mod=vendor
@@ -23,7 +23,7 @@ builds:
     main: ./cmd/tfsec-checkgen
     binary: tfsec-checkgen
     ldflags:
-    - "-X github.com/tfsec/tfsec/version.Version={{.Version}} -s -w -extldflags '-fno-PIC -static'"
+    - "-X github.com/aquasecurity/tfsec/version.Version={{.Version}} -s -w -extldflags '-fno-PIC -static'"
     env:
       - CGO_ENABLED=0
       - GOFLAGS=-mod=vendor
@@ -57,8 +57,9 @@ archives:
     name_template: "{{ .Binary}}-{{ .Os }}-{{ .Arch }}"
 
 release:
+  prerelease: auto
   github:
-    owner: tfsec
+    owner: aquasecurity
     name: tfsec
 
 dockers:
@@ -69,13 +70,49 @@ dockers:
     - tfsec
 
     dockerfile: Dockerfile
+    skip_push: auto
     image_templates:
-    - "tfsec/tfsec:latest"
-    - "tfsec/tfsec:{{ .Tag }}"
-    - "tfsec/tfsec:v{{ .Major }}.{{ .Minor }}"
-    - "tfsec/tfsec-alpine:latest"
-    - "tfsec/tfsec-alpine:{{ .Tag }}"
-    - "tfsec/tfsec-alpine:v{{ .Major }}.{{ .Minor }}"
+    - "aquasec/tfsec:latest"
+    - "aquasec/tfsec:{{ .Tag }}"
+    - "aquasec/tfsec:v{{ .Major }}.{{ .Minor }}"
+    - "aquasec/tfsec-alpine:latest"
+    - "aquasec/tfsec-alpine:{{ .Tag }}"
+    - "aquasec/tfsec-alpine:v{{ .Major }}.{{ .Minor }}"
+  - 
+    goos: linux
+    goarch: amd64
+    ids:
+    - tfsec
+
+    dockerfile: Dockerfile.scratch
+    skip_push: auto
+    image_templates:
+    - "aquasec/tfsec-scratch:latest"
+    - "aquasec/tfsec-scratch:{{ .Tag }}"
+    - "aquasec/tfsec-scratch:v{{ .Major }}.{{ .Minor }}"
+  - 
+    goos: linux
+    goarch: amd64
+    ids:
+    - tfsec
+
+    dockerfile: Dockerfile.ci
+    skip_push: auto
+    image_templates:
+    - "aquasec/tfsec-ci:latest"
+    - "aquasec/tfsec-ci:{{ .Tag }}"
+    - "aquasec/tfsec-ci:v{{ .Major }}.{{ .Minor }}"
+
+  - 
+    goos: linux
+    goarch: amd64
+    ids:
+    - tfsec
+
+    dockerfile: Dockerfile
+    image_templates:
+    - "aquasec/tfsec:{{ .Tag }}"
+    - "aquasec/tfsec-alpine:{{ .Tag }}"
   - 
     goos: linux
     goarch: amd64
@@ -84,9 +121,7 @@ dockers:
 
     dockerfile: Dockerfile.scratch
     image_templates:
-    - "tfsec/tfsec-scratch:latest"
-    - "tfsec/tfsec-scratch:{{ .Tag }}"
-    - "tfsec/tfsec-scratch:v{{ .Major }}.{{ .Minor }}"
+    - "aquasec/tfsec-scratch:{{ .Tag }}"
   - 
     goos: linux
     goarch: amd64
@@ -95,6 +130,4 @@ dockers:
 
     dockerfile: Dockerfile.ci
     image_templates:
-    - "tfsec/tfsec-ci:latest"
-    - "tfsec/tfsec-ci:{{ .Tag }}"
-    - "tfsec/tfsec-ci:v{{ .Major }}.{{ .Minor }}"
+    - "aquasec/tfsec-ci:{{ .Tag }}"

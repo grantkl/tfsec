@@ -3,23 +3,22 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 
 	"github.com/zclconf/go-cty/cty"
 )
 
-// AWSOutdatedSSLPolicy See https://github.com/tfsec/tfsec#included-checks for check info
 const AWSOutdatedSSLPolicy = "AWS010"
 const AWSOutdatedSSLPolicyDescription = "An outdated SSL policy is in use by a load balancer."
 const AWSOutdatedSSLPolicyImpact = "The SSL policy is outdated and has known vulnerabilities"
@@ -61,20 +60,20 @@ func init() {
 				"https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lb_listener",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_lb_listener", "aws_alb_listener"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_lb_listener", "aws_alb_listener"},
+		DefaultSeverity: severity.Critical,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if sslPolicyAttr := block.GetAttribute("ssl_policy"); sslPolicyAttr != nil && sslPolicyAttr.Type() == cty.String {
+			if sslPolicyAttr := resourceBlock.GetAttribute("ssl_policy"); sslPolicyAttr != nil && sslPolicyAttr.Type() == cty.String {
 				for _, policy := range outdatedSSLPolicies {
 					if policy == sslPolicyAttr.Value().AsString() {
 						set.Add(
-							result.New().
-								WithDescription(fmt.Sprintf("Resource '%s' is using an outdated SSL policy.", block.FullName())).
+							result.New(resourceBlock).
+								WithDescription(fmt.Sprintf("Resource '%s' is using an outdated SSL policy.", resourceBlock.FullName())).
 								WithRange(sslPolicyAttr.Range()).
-								WithAttributeAnnotation(sslPolicyAttr).
-								WithSeverity(severity.Error),
+								WithAttributeAnnotation(sslPolicyAttr),
 						)
 					}
 				}

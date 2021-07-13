@@ -4,20 +4,20 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
 	"github.com/zclconf/go-cty/cty"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSUnencryptedKinesisStream = "AWS024"
@@ -54,35 +54,33 @@ func init() {
 				"https://docs.aws.amazon.com/streams/latest/dev/server-side-encryption.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_kinesis_stream"},
-		CheckFunc: func(set result.Set, block *block.Block, context *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_kinesis_stream"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, context *hclcontext.Context) {
 
-			encryptionTypeAttr := block.GetAttribute("encryption_type")
+			encryptionTypeAttr := resourceBlock.GetAttribute("encryption_type")
 			if encryptionTypeAttr == nil {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' defines an unencrypted Kinesis Stream.", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' defines an unencrypted Kinesis Stream.", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
 			} else if encryptionTypeAttr.Type() == cty.String && strings.ToUpper(encryptionTypeAttr.Value().AsString()) != "KMS" {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' defines an unencrypted Kinesis Stream.", block.FullName())).
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' defines an unencrypted Kinesis Stream.", resourceBlock.FullName())).
 						WithRange(encryptionTypeAttr.Range()).
-						WithAttributeAnnotation(encryptionTypeAttr).
-						WithSeverity(severity.Error),
+						WithAttributeAnnotation(encryptionTypeAttr),
 				)
 			} else {
-				keyIDAttr := block.GetAttribute("kms_key_id")
+				keyIDAttr := resourceBlock.GetAttribute("kms_key_id")
 				if keyIDAttr == nil || keyIDAttr.IsEmpty() || keyIDAttr.Equals("alias/aws/kinesis") {
 					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' defines a Kinesis Stream encrypted with the default Kinesis key.", block.FullName())).
-							WithRange(block.Range()).
-							WithSeverity(severity.Warning),
+						result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("Resource '%s' defines a Kinesis Stream encrypted with the default Kinesis key.", resourceBlock.FullName())).
+							WithRange(resourceBlock.Range()),
 					)
 				}
 			}

@@ -2,7 +2,7 @@
 
 Thank you for considering contributing to tfsec! 
 
-We've documented the process of adding a new check below. If you have any other specific questions/problems that are preventing you from raising a PR, please get in touch with us! You can [find us on Slack](https://join.slack.com/t/tfsec/shared_invite/zt-i0vo9rp2-tEizIaT1dS4Eu2hVIsvwDg) - or simply [raise an issue](https://github.com/tfsec/tfsec/issues/new) and we'll do our best to help you out.
+We've documented the process of adding a new check below. If you have any other specific questions/problems that are preventing you from raising a PR, please get in touch with us! You can [find us on Slack](https://join.slack.com/t/tfsec/shared_invite/zt-i0vo9rp2-tEizIaT1dS4Eu2hVIsvwDg) - or simply [raise an issue](https://github.com/aquasecurity/tfsec/issues/new) and we'll do our best to help you out.
 
 ## Adding a New Check
 
@@ -21,6 +21,18 @@ Key attributes requested;
 - Required Label: What kind of labels is this check for (aws_instance, google_container_cluster). Provide this as a space separated list
 
 The generator will determine the next available code and create the check and the check test.
+
+### Determining Severity
+
+We currently use the following list of severities:
+
+| Level    | When to use                                                                     | Example                                               |
+| -------- | ------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Critical | A direct risk of compromise to infrastructure, data or other assets.            | A database resource is marked as publicly accessible. |
+| High     | A misconfiguration which compromises security of the infrastructure.            | A storage medium is unencrypted.                      |
+| Medium   | Best practice has not been followed which impacts security of the organisation. | "Force destroy" is enabled on a bucket.               |
+| Low      | Best practice has not been followed, which decreases operational efficiency.    | Description missing on security group rule.           |
+
 
 ### Writing Your Check Code
 
@@ -95,6 +107,7 @@ func init() {
 		RequiredLabels: []string{"aws_gibson"},
         
         	// the actual logic for your check
+		DefaultSeverity: severity.Warning,
 		CheckFunc: func(set result.Set, block *parser.Block, _ *hclcontext.Context) {
 			// TODO: add check logic here
 		},
@@ -107,16 +120,17 @@ Now all that's left is writing the logic itself. You'll likely find it useful he
 ```go
 ...
 
-        CheckFunc: func(set result.Set, block *parser.Block, _ *hclcontext.Context) {
+        DefaultSeverity: severity.Warning,
+CheckFunc: func(set result.Set, block *parser.Block, _ *hclcontext.Context) {
 
             if attr := block.GetAttribute("hackable"); attr != nil && attr.Value().Type() == cty.Bool {
                 if attr.Value().True() {
                     set.Add(
-                        result.New().
+                        result.New(resourceBlock).
 						WithDescription(fmt.Sprintf("The Gibson '%s' is configured to be hackable.", block.Name())).
 						WithRange(attr.Range()).
 						WithAttributeAnnotation(attr).
-						WithSeverity(SeverityWarning),
+						,
 					)
                 }
             }
@@ -124,7 +138,7 @@ Now all that's left is writing the logic itself. You'll likely find it useful he
 ...
 ```
 
-You can see a good example of a real check file [here](https://github.com/tfsec/tfsec/blob/master/internal/app/tfsec/rules/aws001.go).
+You can see a good example of a real check file [here](https://github.com/aquasecurity/tfsec/blob/master/internal/app/tfsec/rules/aws001.go).
 
 ### Writing Tests
 
@@ -138,8 +152,8 @@ package test
 import (
 	"testing"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/checks"
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/checks"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 func Test_AWSGibsonHackable(t *testing.T) {

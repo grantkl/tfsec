@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AZUSSHAccessNotAllowedFromInternet = "AZU017"
@@ -93,16 +93,17 @@ func init() {
 				"https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/network_security_rule#source_port_ranges",
 			},
 		},
-		Provider:       provider.AzureProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"azurerm_network_security_group", "azurerm_network_security_rule"},
-		CheckFunc: func(set result.Set, b *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AzureProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"azurerm_network_security_group", "azurerm_network_security_rule"},
+		DefaultSeverity: severity.Critical,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
 			var securityRules block.Blocks
-			if b.IsResourceType("azurerm_network_security_group") {
-				securityRules = b.GetBlocks("security_rule")
+			if resourceBlock.IsResourceType("azurerm_network_security_group") {
+				securityRules = resourceBlock.GetBlocks("security_rule")
 			} else {
-				securityRules = append(securityRules, b)
+				securityRules = append(securityRules, resourceBlock)
 			}
 
 			for _, securityRule := range securityRules {
@@ -113,10 +114,9 @@ func init() {
 					if securityRule.HasChild("source_address_prefix") {
 						if securityRule.GetAttribute("source_address_prefix").IsAny("*", "0.0.0.0", "/0", "internet", "any") {
 							set.Add(
-								result.New().
-									WithDescription(fmt.Sprintf("Resource '%s' has a .", b.FullName())).
-									WithRange(b.Range()).
-									WithSeverity(severity.Error),
+								result.New(resourceBlock).
+									WithDescription(fmt.Sprintf("Resource '%s' has a .", resourceBlock.FullName())).
+									WithRange(resourceBlock.Range()),
 							)
 						}
 					}

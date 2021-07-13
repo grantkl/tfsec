@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSCodeBuildProjectEncryptionNotDisabled = "AWS080"
@@ -101,13 +101,14 @@ func init() {
 				"https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/codebuild_project#encryption_disabled",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_codebuild_project"},
-		CheckFunc: func(set result.Set, b *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_codebuild_project"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			blocks := b.GetBlocks("secondary_artifacts")
-			if artifact := b.GetBlock("artifacts"); artifact != nil {
+			blocks := resourceBlock.GetBlocks("secondary_artifacts")
+			if artifact := resourceBlock.GetBlock("artifacts"); artifact != nil {
 				blocks = append(blocks, artifact)
 			}
 
@@ -115,21 +116,19 @@ func init() {
 				if encryptionDisabledAttr := artifactBlock.GetAttribute("encryption_disabled"); encryptionDisabledAttr != nil && encryptionDisabledAttr.IsTrue() {
 					artifactTypeAttr := artifactBlock.GetAttribute("type")
 
-					if artifactTypeAttr.Equals("NO_ARTIFACTS", block.IgnoreCase) {
+					if artifactTypeAttr != nil && artifactTypeAttr.Equals("NO_ARTIFACTS", block.IgnoreCase) {
 						set.Add(
-							result.New().
-								WithDescription(fmt.Sprintf("CodeBuild project '%s' is configured to disable artifact encryption while no artifacts are produced", b.FullName())).
+							result.New(resourceBlock).
+								WithDescription(fmt.Sprintf("CodeBuild project '%s' is configured to disable artifact encryption while no artifacts are produced", resourceBlock.FullName())).
 								WithRange(artifactBlock.Range()).
-								WithAttributeAnnotation(artifactTypeAttr).
-								WithSeverity(severity.Warning),
+								WithAttributeAnnotation(artifactTypeAttr),
 						)
 					} else {
 						set.Add(
-							result.New().
-								WithDescription(fmt.Sprintf("CodeBuild project '%s' does not encrypt produced artifacts", b.FullName())).
+							result.New(resourceBlock).
+								WithDescription(fmt.Sprintf("CodeBuild project '%s' does not encrypt produced artifacts", resourceBlock.FullName())).
 								WithRange(artifactBlock.Range()).
-								WithAttributeAnnotation(encryptionDisabledAttr).
-								WithSeverity(severity.Error),
+								WithAttributeAnnotation(encryptionDisabledAttr),
 						)
 					}
 				}

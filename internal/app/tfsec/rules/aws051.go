@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSRDSAuroraClusterEncryptionDisabled = "AWS051"
@@ -53,37 +53,35 @@ func init() {
 				"https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/rds_cluster",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_rds_cluster"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_rds_cluster"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			kmsKeyIdAttr := block.GetAttribute("kms_key_id")
-			storageEncryptedattr := block.GetAttribute("storage_encrypted")
+			kmsKeyIdAttr := resourceBlock.GetAttribute("kms_key_id")
+			storageEncryptedattr := resourceBlock.GetAttribute("storage_encrypted")
 
 			if (kmsKeyIdAttr == nil || kmsKeyIdAttr.IsEmpty()) &&
 				(storageEncryptedattr == nil || storageEncryptedattr.IsFalse()) {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' defines a disabled RDS Cluster encryption.", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' defines a disabled RDS Cluster encryption.", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
-			} else if kmsKeyIdAttr.Equals("") {
+			} else if kmsKeyIdAttr != nil && kmsKeyIdAttr.Equals("") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' defines a disabled RDS Cluster encryption.", block.FullName())).
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' defines a disabled RDS Cluster encryption.", resourceBlock.FullName())).
 						WithRange(kmsKeyIdAttr.Range()).
-						WithAttributeAnnotation(kmsKeyIdAttr).
-						WithSeverity(severity.Error),
+						WithAttributeAnnotation(kmsKeyIdAttr),
 				)
 			} else if storageEncryptedattr == nil || storageEncryptedattr.IsFalse() {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' defines a enabled RDS Cluster encryption but not the required encrypted_storage.", block.FullName())).
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' defines a enabled RDS Cluster encryption but not the required encrypted_storage.", resourceBlock.FullName())).
 						WithRange(kmsKeyIdAttr.Range()).
-						WithAttributeAnnotation(kmsKeyIdAttr).
-						WithSeverity(severity.Error),
+						WithAttributeAnnotation(kmsKeyIdAttr),
 				)
 			}
 		},

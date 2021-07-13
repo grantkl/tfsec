@@ -3,22 +3,22 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSBadBucketACL = "AWS001"
-const AwsBadBucketACLDescription = "S3 Bucket has an ACL defined which allows public access."
+const AWSBadBucketACLDescription = "S3 Bucket has an ACL defined which allows public access."
 const AWSBadBucketACLImpact = "The contents of the bucket can be accessed publicly"
 const AWSBadBucketACLResolution = "Apply a more restrictive bucket ACL"
 const AWSBadBucketACLExplanation = `
@@ -43,7 +43,7 @@ func init() {
 	scanner.RegisterCheckRule(rule.Rule{
 		ID: AWSBadBucketACL,
 		Documentation: rule.RuleDocumentation{
-			Summary:     AwsBadBucketACLDescription,
+			Summary:     AWSBadBucketACLDescription,
 			Explanation: AWSBadBucketACLExplanation,
 			Impact:      AWSBadBucketACLImpact,
 			Resolution:  AWSBadBucketACLResolution,
@@ -54,25 +54,24 @@ func init() {
 				"https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_s3_bucket"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
-			if attr := block.GetAttribute("acl"); attr != nil {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_s3_bucket"},
+		DefaultSeverity: severity.Critical,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
+			if attr := resourceBlock.GetAttribute("acl"); attr != nil {
 				if attr.IsAny("public-read", "public-read-write", "website") {
 					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' has an ACL which allows public access.", block.FullName())).
+						result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("Resource '%s' has an ACL which allows public access.", resourceBlock.FullName())).
 							WithAttributeAnnotation(attr).
-							WithRange(attr.Range()).
-							WithSeverity(severity.Warning),
+							WithRange(attr.Range()),
 					)
 				} else if attr.Equals("authenticated-read") {
 					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' has an ACL which allows access to any authenticated AWS user, not just users within the target account.", block.FullName())).
-							WithRange(attr.Range()).
-							WithSeverity(severity.Warning),
+						result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("Resource '%s' has an ACL which allows access to any authenticated AWS user, not just users within the target account.", resourceBlock.FullName())).
+							WithRange(attr.Range()),
 					)
 				}
 			}

@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/rules"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/rules"
 )
 
 func Test_AWSSensitiveAttributes(t *testing.T) {
@@ -46,11 +46,19 @@ resource "google_secret_manager_secret" "secret" {
 }`,
 			mustExcludeResultCode: rules.GenericSensitiveAttributes,
 		},
+		{
+			name: "avoid false positive for non-string attributes",
+			source: `
+resource "something" "secret" {
+	secret = true
+}`,
+			mustExcludeResultCode: rules.GenericSensitiveAttributes,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			results := scanSource(test.source)
+			results := scanHCL(test.source, t)
 			assertCheckCode(t, test.mustIncludeResultCode, test.mustExcludeResultCode, results)
 		})
 	}
@@ -76,7 +84,7 @@ resource "github_actions_secret" "infrastructure_digitalocean_deploy_user" {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			results := scanSource(test.source)
+			results := scanHCL(test.source, t)
 			assertCheckCode(t, test.mustIncludeResultCode, test.mustExcludeResultCode, results)
 		})
 	}

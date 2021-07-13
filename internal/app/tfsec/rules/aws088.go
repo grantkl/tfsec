@@ -3,22 +3,22 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSRedisClusterBackupRetention = "AWS088"
-const AWSRedisClusterBackupRetentionDescription = "Redis cluster should be backup retention turned on"
+const AWSRedisClusterBackupRetentionDescription = "Redis cluster should have backup retention turned on"
 const AWSRedisClusterBackupRetentionImpact = "Without backups of the redis cluster recovery is made difficult"
 const AWSRedisClusterBackupRetentionResolution = "Configure snapshot retention for redis cluster"
 const AWSRedisClusterBackupRetentionExplanation = `
@@ -64,31 +64,34 @@ func init() {
 				"https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/backups-automatic.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_elasticache_cluster"},
-		CheckFunc: func(set result.Set, b *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_elasticache_cluster"},
+		DefaultSeverity: severity.Medium,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			engineAttr := b.GetAttribute("engine")
-			if engineAttr.Equals("redis", block.IgnoreCase) && !b.GetAttribute("node_type").Equals("cache.t1.micro") {
-				snapshotRetentionAttr := b.GetAttribute("snapshot_retention_limit")
-				if snapshotRetentionAttr == nil {
-					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' should have snapshot retention specified", b.FullName())).
-							WithRange(b.Range()).
-							WithSeverity(severity.Warning),
-					)
-				}
+			engineAttr := resourceBlock.GetAttribute("engine")
+			if engineAttr != nil && engineAttr.Equals("redis", block.IgnoreCase) {
+				nodeTypeAttr := resourceBlock.GetAttribute("node_type")
+				if nodeTypeAttr != nil && !nodeTypeAttr.Equals("cache.t1.micro") {
+					snapshotRetentionAttr := resourceBlock.GetAttribute("snapshot_retention_limit")
+					if snapshotRetentionAttr == nil {
+						set.Add(
+							result.New(resourceBlock).
+								WithDescription(fmt.Sprintf("Resource '%s' should have snapshot retention specified", resourceBlock.FullName())).
+								WithRange(resourceBlock.Range()),
+						)
+						return
+					}
 
-				if snapshotRetentionAttr.Equals(0) {
-					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' has snapshot retention set to 0", b.FullName())).
-							WithRange(snapshotRetentionAttr.Range()).
-							WithAttributeAnnotation(snapshotRetentionAttr).
-							WithSeverity(severity.Warning),
-					)
+					if snapshotRetentionAttr.Equals(0) {
+						set.Add(
+							result.New(resourceBlock).
+								WithDescription(fmt.Sprintf("Resource '%s' has snapshot retention set to 0", resourceBlock.FullName())).
+								WithRange(snapshotRetentionAttr.Range()).
+								WithAttributeAnnotation(snapshotRetentionAttr),
+						)
+					}
 				}
 			}
 

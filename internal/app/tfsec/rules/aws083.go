@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSALBDropsInvalidHeaders = "AWS083"
@@ -72,29 +72,33 @@ func init() {
 				"https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_alb", "aws_lb"},
-		CheckFunc: func(set result.Set, b *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_alb", "aws_lb"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if b.GetAttribute("load_balancer_type").Equals("application", block.IgnoreCase) {
-				if b.MissingChild("drop_invalid_header_fields") {
+			if resourceBlock.GetAttribute("load_balancer_type") == nil {
+				return
+			}
+
+			if resourceBlock.GetAttribute("load_balancer_type").Equals("application", block.IgnoreCase) {
+				if resourceBlock.MissingChild("drop_invalid_header_fields") {
 					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' does not drop invalid header fields", b.FullName())).
-							WithRange(b.Range()).
-							WithSeverity(severity.Error),
+						result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("Resource '%s' does not drop invalid header fields", resourceBlock.FullName())).
+							WithRange(resourceBlock.Range()),
 					)
+					return
 				}
 
-				attr := b.GetAttribute("drop_invalid_header_fields")
+				attr := resourceBlock.GetAttribute("drop_invalid_header_fields")
 				if attr.IsFalse() {
 					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' sets the drop_invalid_header_fields to false", b.FullName())).
+						result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("Resource '%s' sets the drop_invalid_header_fields to false", resourceBlock.FullName())).
 							WithRange(attr.Range()).
-							WithAttributeAnnotation(attr).
-							WithSeverity(severity.Error),
+							WithAttributeAnnotation(attr),
 					)
 				}
 

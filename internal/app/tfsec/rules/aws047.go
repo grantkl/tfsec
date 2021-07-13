@@ -5,20 +5,20 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
 	"github.com/zclconf/go-cty/cty"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSSqsPolicyWildcardActions = "AWS047"
@@ -80,15 +80,21 @@ func init() {
 				"https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/sqs_queue_policy",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_sqs_queue_policy"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_sqs_queue_policy"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if block.GetAttribute("policy").Value().Type() != cty.String {
+			if resourceBlock.MissingChild("policy") {
+				return
 			}
 
-			rawJSON := []byte(block.GetAttribute("policy").Value().AsString())
+			if resourceBlock.GetAttribute("policy").Value().Type() != cty.String {
+				return
+			}
+
+			rawJSON := []byte(resourceBlock.GetAttribute("policy").Value().AsString())
 			var policy struct {
 				Statement []struct {
 					Effect string `json:"Effect"`
@@ -100,10 +106,9 @@ func init() {
 				for _, statement := range policy.Statement {
 					if strings.ToLower(statement.Effect) == "allow" && (statement.Action == "*" || statement.Action == "sqs:*") {
 						set.Add(
-							result.New().
-								WithDescription(fmt.Sprintf("SQS policy '%s' has a wildcard action specified.", block.FullName())).
-								WithRange(block.Range()).
-								WithSeverity(severity.Error),
+							result.New(resourceBlock).
+								WithDescription(fmt.Sprintf("SQS policy '%s' has a wildcard action specified.", resourceBlock.FullName())).
+								WithRange(resourceBlock.Range()),
 						)
 					}
 				}

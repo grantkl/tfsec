@@ -4,23 +4,22 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
 	"github.com/zclconf/go-cty/cty"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
-// GoogleUserIAMGrant See https://github.com/tfsec/tfsec#included-checks for check info
 const GoogleUserIAMGrant = "GCP011"
 const GoogleUserIAMGrantDescription = "IAM granted directly to user."
 const GoogleUserIAMGrantImpact = "Users shouldn't have permissions granted to them directly"
@@ -99,29 +98,30 @@ func init() {
 			"google_storage_bucket_iam_member",
 			"google_iam_policy",
 		},
-		CheckFunc: func(set result.Set, b *block.Block, _ *hclcontext.Context) {
+		DefaultSeverity: severity.Medium,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
 			var members []cty.Value
-			var attributes *block.Attribute
+			var attribute block.Attribute
 
-			if attributes = b.GetAttribute("member"); attributes != nil {
-				members = append(members, attributes.Value())
-			} else if attributes = b.GetAttribute("members"); attributes != nil {
-				members = attributes.Value().AsValueSlice()
-			} else if attributes = b.GetBlock("binding").GetAttribute("members"); attributes != nil {
-				members = attributes.Value().AsValueSlice()
+			if attribute = resourceBlock.GetAttribute("member"); attribute != nil {
+				members = append(members, attribute.Value())
+			} else if attribute = resourceBlock.GetAttribute("members"); attribute != nil {
+				members = attribute.Value().AsValueSlice()
+			} else if resourceBlock.HasChild("binding") {
+				if attribute = resourceBlock.GetBlock("binding").GetAttribute("members"); attribute != nil {
+					members = attribute.Value().AsValueSlice()
+				}
 			}
 			for _, identities := range members {
 				if identities.IsKnown() && identities.Type() == cty.String && strings.HasPrefix(identities.AsString(), "user:") {
 					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("'%s' grants IAM to a user object. It is recommended to manage user permissions with groups.", b.FullName())).
-							WithRange(attributes.Range()).
-							WithSeverity(severity.Warning),
+						result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("'%s' grants IAM to a user object. It is recommended to manage user permissions with groups.", resourceBlock.FullName())).
+							WithRange(attribute.Range()),
 					)
 				}
 			}
-
 		},
 	})
 }

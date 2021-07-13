@@ -9,12 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tfsec/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/result"
 
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/parser"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 	"github.com/stretchr/testify/assert"
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
-	"github.com/tfsec/tfsec/internal/app/tfsec/parser"
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
 )
 
 func init() {
@@ -29,7 +29,7 @@ func init() {
       "requiredLabels": [
         "aws_vpc"
       ],
-      "severity": "ERROR",
+      "severity": "HIGH",
       "matchSpec": {
         "action": "requiresPresence",
 		"name": "aws_flow_log"
@@ -179,8 +179,8 @@ resource "aws_ami" "example" {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			blocks := createBlocksFromSource(test.source)[0]
-			result := evalMatchSpec(blocks, &test.predicateMatchSpec, nil)
+			block := createBlocksFromSource(test.source)[0]
+			result := evalMatchSpec(block, &test.predicateMatchSpec, nil)
 			assert.Equal(t, result, test.expected, "`Or` match function evaluating incorrectly.")
 		})
 	}
@@ -328,12 +328,12 @@ func scanTerraform(t *testing.T, mainTf string) []result.Result {
 	blocks, err := parser.New(dirName, parser.OptionStopOnHCLError()).ParseDirectory()
 	assert.NoError(t, err)
 
-	return scanner.New().Scan(blocks)
+	return scanner.New(scanner.OptionIgnoreCheckErrors(false)).Scan(blocks)
 }
 
 // This function is copied from setup_test.go as it is not possible to import function from test files.
 // TODO: Extract into a testing utility package once the amount of duplication justifies introducing an extra package.
-func createBlocksFromSource(source string) []*block.Block {
+func createBlocksFromSource(source string) []block.Block {
 	path := createTestFile("test.tf", source)
 	blocks, err := parser.New(filepath.Dir(path), parser.OptionStopOnHCLError()).ParseDirectory()
 	if err != nil {

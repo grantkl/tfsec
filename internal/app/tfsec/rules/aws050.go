@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 	"github.com/zclconf/go-cty/cty"
 )
 
@@ -59,56 +59,52 @@ func init() {
 				"https://docs.aws.amazon.com/vpc/latest/userguide/vpc-network-acls.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_network_acl_rule"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_network_acl_rule"},
+		DefaultSeverity: severity.Critical,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			egressAttr := block.GetAttribute("egress")
-			actionAttr := block.GetAttribute("rule_action")
-			protoAttr := block.GetAttribute("protocol")
+			egressAttr := resourceBlock.GetAttribute("egress")
+			actionAttr := resourceBlock.GetAttribute("rule_action")
+			protoAttr := resourceBlock.GetAttribute("protocol")
 
-			if egressAttr.Type() == cty.Bool && egressAttr.Value().True() {
+			if egressAttr != nil && egressAttr.IsTrue() {
+				return
 			}
 
 			if actionAttr == nil || actionAttr.Type() != cty.String {
+				return
 			}
 
 			if actionAttr.Value().AsString() != "allow" {
+				return
 			}
 
-			if cidrBlockAttr := block.GetAttribute("cidr_block"); cidrBlockAttr != nil {
-
+			if cidrBlockAttr := resourceBlock.GetAttribute("cidr_block"); cidrBlockAttr != nil {
 				if isOpenCidr(cidrBlockAttr) {
 					if protoAttr.Value().AsString() == "all" || protoAttr.Value().AsString() == "-1" {
 						set.Add(
-							result.New().
-								WithDescription(fmt.Sprintf("Resource '%s' defines a fully open ingress Network ACL rule with ALL ports open.", block.FullName())).
+							result.New(resourceBlock).
+								WithDescription(fmt.Sprintf("Resource '%s' defines a fully open ingress Network ACL rule with ALL ports open.", resourceBlock.FullName())).
 								WithRange(cidrBlockAttr.Range()).
-								WithAttributeAnnotation(cidrBlockAttr).
-								WithSeverity(severity.Error),
+								WithAttributeAnnotation(cidrBlockAttr),
 						)
-					} else {
 					}
 				}
-
 			}
 
-			if ipv6CidrBlockAttr := block.GetAttribute("ipv6_cidr_block"); ipv6CidrBlockAttr != nil {
-
+			if ipv6CidrBlockAttr := resourceBlock.GetAttribute("ipv6_cidr_block"); ipv6CidrBlockAttr != nil {
 				if isOpenCidr(ipv6CidrBlockAttr) {
 					if protoAttr.Value().AsString() == "all" || protoAttr.Value().AsString() == "-1" {
 						set.Add(
-							result.New().
-								WithDescription(fmt.Sprintf("Resource '%s' defines a fully open ingress Network ACL rule with ALL ports open.", block.FullName())).
+							result.New(resourceBlock).
+								WithDescription(fmt.Sprintf("Resource '%s' defines a fully open ingress Network ACL rule with ALL ports open.", resourceBlock.FullName())).
 								WithRange(ipv6CidrBlockAttr.Range()).
-								WithAttributeAnnotation(ipv6CidrBlockAttr).
-								WithSeverity(severity.Error),
+								WithAttributeAnnotation(ipv6CidrBlockAttr),
 						)
-					} else {
 					}
 				}
-
 			}
 
 		},

@@ -7,19 +7,19 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/parser"
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/parser"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const exampleCheckCode = "EXA001"
@@ -47,12 +47,13 @@ resource "problem" "x" {
 `,
 			Links: nil,
 		},
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"problem"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
-			if block.GetAttribute("bad") != nil {
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"problem"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
+			if resourceBlock.GetAttribute("bad") != nil {
 				set.Add(
-					result.New().WithDescription("example problem").WithRange(block.Range()).WithSeverity(severity.Error),
+					result.New(resourceBlock).WithDescription("example problem").WithRange(resourceBlock.Range()),
 				)
 			}
 		},
@@ -61,16 +62,21 @@ resource "problem" "x" {
 	os.Exit(t.Run())
 }
 
-func scanSource(source string) []result.Result {
-	blocks := createBlocksFromSource(source)
-	return scanner.New(scanner.OptionExcludeRules(excludedChecksList)).Scan(blocks)
+func scanHCL(source string, t *testing.T) []result.Result {
+	blocks := createBlocksFromSource(source, ".tf", t)
+	return scanner.New(scanner.OptionExcludeRules(excludedChecksList), scanner.OptionIgnoreCheckErrors(false)).Scan(blocks)
 }
 
-func createBlocksFromSource(source string) []*block.Block {
-	path := createTestFile("test.tf", source)
+func scanJSON(source string, t *testing.T) []result.Result {
+	blocks := createBlocksFromSource(source, ".tf.json", t)
+	return scanner.New(scanner.OptionExcludeRules(excludedChecksList), scanner.OptionIgnoreCheckErrors(false)).Scan(blocks)
+}
+
+func createBlocksFromSource(source string, ext string, t *testing.T) []block.Block {
+	path := createTestFile("test"+ext, source)
 	blocks, err := parser.New(filepath.Dir(path), parser.OptionStopOnHCLError()).ParseDirectory()
 	if err != nil {
-		panic(err)
+		t.Fatalf("parse error: %s", err)
 	}
 	return blocks
 }

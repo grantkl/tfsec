@@ -3,25 +3,24 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
-// AWSNoDescriptionInSecurityGroup See https://github.com/tfsec/tfsec#included-checks for check info
 const AWSNoDescriptionInSecurityGroup = "AWS018"
 const AWSNoDescriptionInSecurityGroupDescription = "Missing description for security group/security group rule."
-const AWSNoDescriptionInSecurityGroupImpact = "Descriptions provide hclcontext for the firewall rule reasons"
-const AWSNoDescriptionInSecurityGroupResolution = "Add descriptions for all security groups anf rules"
+const AWSNoDescriptionInSecurityGroupImpact = "Descriptions provide context for the firewall rule reasons"
+const AWSNoDescriptionInSecurityGroupResolution = "Add descriptions for all security groups and rules"
 const AWSNoDescriptionInSecurityGroupExplanation = `
 Security groups and security group rules should include a description for auditing purposes.
 
@@ -71,28 +70,27 @@ func init() {
 				"https://www.cloudconformity.com/knowledge-base/aws/EC2/security-group-rules-description.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_security_group", "aws_security_group_rule"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
-			if block.MissingChild("description") {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_security_group", "aws_security_group_rule"},
+		DefaultSeverity: severity.Low,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
+			if resourceBlock.MissingChild("description") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' should include a description for auditing purposes.", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' should include a description for auditing purposes.", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
 				return
 			}
 
-			descriptionAttr := block.GetAttribute("description")
+			descriptionAttr := resourceBlock.GetAttribute("description")
 			if descriptionAttr.IsEmpty() {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' should include a non-empty description for auditing purposes.", block.FullName())).
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' should include a non-empty description for auditing purposes.", resourceBlock.FullName())).
 						WithRange(descriptionAttr.Range()).
-						WithAttributeAnnotation(descriptionAttr).
-						WithSeverity(severity.Error),
+						WithAttributeAnnotation(descriptionAttr),
 				)
 			}
 		},

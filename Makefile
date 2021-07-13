@@ -6,7 +6,7 @@ image:
 
 .PHONY: test
 test:
-	go test -mod=vendor -v ./...
+	go test -mod=vendor ./...
 
 .PHONY: build
 build:
@@ -31,3 +31,33 @@ new-check:
 .PHONY: lint-pr-checks
 lint-pr-checks:
 	@go run ./cmd/tfsec-pr-lint
+
+.PHONY: tagger
+tagger:
+	@git pull origin master
+	@git tag -a ${TAG} -m ${TAG}
+	@git push --tags
+
+.PHONY: cyclo
+cyclo:
+	which gocyclo || go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+	gocyclo -over 15 -ignore 'vendor/|funcs/' .
+
+.PHONY: vet
+vet:
+	go vet ./...
+
+.PHONY: typos
+typos:
+	./scripts/typos.sh
+
+.PHONY: quality
+quality: cyclo vet typos
+
+.PHONY: fix-typos
+fix-typos:
+	./scripts/typos.sh fix
+
+.PHONY: clone-image
+clone-image:
+	./scripts/clone-images.sh

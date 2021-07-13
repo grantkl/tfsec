@@ -4,20 +4,20 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
 	"github.com/zclconf/go-cty/cty"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AzureOpenOutboundNetworkSecurityGroupRule = "AZU002"
@@ -57,42 +57,42 @@ func init() {
 				"https://www.terraform.io/docs/providers/azurerm/r/network_security_rule.html",
 			},
 		},
-		Provider:       provider.AzureProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"azurerm_network_security_rule"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AzureProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"azurerm_network_security_rule"},
+		DefaultSeverity: severity.Critical,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			directionAttr := block.GetAttribute("direction")
-			if directionAttr == nil || directionAttr.Type() != cty.String || directionAttr.Value().AsString() != "Outbound" {
+			directionAttr := resourceBlock.GetAttribute("direction")
+			if directionAttr == nil || directionAttr.Type() != cty.String || strings.ToUpper(directionAttr.Value().AsString()) != "OUTBOUND" {
+				return
 			}
 
-			if prefixAttr := block.GetAttribute("destination_address_prefix"); prefixAttr != nil && prefixAttr.Type() == cty.String {
+			if prefixAttr := resourceBlock.GetAttribute("destination_address_prefix"); prefixAttr != nil && prefixAttr.Type() == cty.String {
 				if isOpenCidr(prefixAttr) {
-					if accessAttr := block.GetAttribute("access"); accessAttr != nil && accessAttr.Value().AsString() == "Allow" {
+					if accessAttr := resourceBlock.GetAttribute("access"); accessAttr != nil && strings.ToUpper(accessAttr.Value().AsString()) == "ALLOW" {
 						set.Add(
-							result.New().
+							result.New(resourceBlock).
 								WithDescription(fmt.Sprintf(
 									"Resource '%s' defines a fully open %s network security group rule.",
-									block.FullName(),
+									resourceBlock.FullName(),
 									strings.ToLower(directionAttr.Value().AsString()),
 								)).
 								WithRange(prefixAttr.Range()).
-								WithAttributeAnnotation(prefixAttr).
-								WithSeverity(severity.Warning),
+								WithAttributeAnnotation(prefixAttr),
 						)
 					}
 				}
 			}
 
-			if prefixesAttr := block.GetAttribute("destination_address_prefixes"); prefixesAttr != nil && prefixesAttr.Value().LengthInt() > 0 {
+			if prefixesAttr := resourceBlock.GetAttribute("destination_address_prefixes"); prefixesAttr != nil && prefixesAttr.Value().LengthInt() > 0 {
 				if isOpenCidr(prefixesAttr) {
-					if accessAttr := block.GetAttribute("access"); accessAttr != nil && accessAttr.Value().AsString() == "Allow" {
+					if accessAttr := resourceBlock.GetAttribute("access"); accessAttr != nil && strings.ToUpper(accessAttr.Value().AsString()) == "ALLOW" {
 						set.Add(
-							result.New().
-								WithDescription(fmt.Sprintf("Resource '%s' defines a fully open security group rule.", block.FullName())).
+							result.New(resourceBlock).
+								WithDescription(fmt.Sprintf("Resource '%s' defines a fully open security group rule.", resourceBlock.FullName())).
 								WithRange(prefixesAttr.Range()).
-								WithAttributeAnnotation(prefixesAttr).
-								WithSeverity(severity.Warning),
+								WithAttributeAnnotation(prefixesAttr),
 						)
 					}
 				}

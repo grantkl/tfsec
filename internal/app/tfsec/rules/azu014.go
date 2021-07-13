@@ -3,24 +3,24 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AZURequireSecureTransferForStorageAccounts = "AZU014"
 const AZURequireSecureTransferForStorageAccountsDescription = "Storage accounts should be configured to only accept transfers that are over secure connections"
 const AZURequireSecureTransferForStorageAccountsImpact = "Insecure transfer of data into secure accounts could be read if intercepted"
-const AZURequireSecureTransferForStorageAccountsResolution = "Only allow secure connection for transfering data into storage accounts"
+const AZURequireSecureTransferForStorageAccountsResolution = "Only allow secure connection for transferring data into storage accounts"
 const AZURequireSecureTransferForStorageAccountsExplanation = `
 You can configure your storage account to accept requests from secure connections only by setting the Secure transfer required property for the storage account. 
 
@@ -64,17 +64,17 @@ func init() {
 				"https://docs.microsoft.com/en-us/azure/storage/common/storage-require-secure-transfer",
 			},
 		},
-		Provider:       provider.AzureProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"azurerm_storage_account"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AzureProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"azurerm_storage_account"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if block.HasChild("enable_https_traffic_only") && block.GetAttribute("enable_https_traffic_only").IsFalse() {
+			if resourceBlock.HasChild("enable_https_traffic_only") && resourceBlock.GetAttribute("enable_https_traffic_only").IsFalse() {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' explicitly turns off secure transfer to storage account.", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' explicitly turns off secure transfer to storage account.", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
 			}
 

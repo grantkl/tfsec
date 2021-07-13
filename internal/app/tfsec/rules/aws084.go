@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSAWSWorkspaceVolumesEncrypted = "AWS084"
@@ -72,47 +72,45 @@ func init() {
 				"https://docs.aws.amazon.com/workspaces/latest/adminguide/encrypt-workspaces.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_workspaces_workspace"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_workspaces_workspace"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if block.MissingChild("root_volume_encryption_enabled") {
+			if resourceBlock.MissingChild("root_volume_encryption_enabled") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' should have root volume encryption enables", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' should have root volume encryption enables", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
 			} else {
-				attr := block.GetAttribute("root_volume_encryption_enabled")
-				if attr.IsFalse() {
-					set.Add(result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' has the root volume encyption set to false", block.FullName())).
+				attr := resourceBlock.GetAttribute("root_volume_encryption_enabled")
+				if attr != nil && attr.IsFalse() {
+					set.Add(result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' has the root volume encryption set to false", resourceBlock.FullName())).
 						WithRange(attr.Range()).
-						WithAttributeAnnotation(attr).
-						WithSeverity(severity.Error),
+						WithAttributeAnnotation(attr),
 					)
 				}
 			}
 
-			if block.MissingChild("user_volume_encryption_enabled") {
-				set.Add(result.New().
-					WithDescription(fmt.Sprintf("Resource '%s' should have user volume encryption enables", block.FullName())).
-					WithRange(block.Range()).
-					WithSeverity(severity.Error),
+			if resourceBlock.MissingChild("user_volume_encryption_enabled") {
+				set.Add(result.New(resourceBlock).
+					WithDescription(fmt.Sprintf("Resource '%s' should have user volume encryption enables", resourceBlock.FullName())).
+					WithRange(resourceBlock.Range()),
 				)
-			} else {
-				attr := block.GetAttribute("user_volume_encryption_enabled")
-				if attr.IsFalse() {
-					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' has the user volume encyption set to false", block.FullName())).
-							WithRange(attr.Range()).
-							WithAttributeAnnotation(attr).
-							WithSeverity(severity.Error),
-					)
-				}
+				return
+			}
+
+			attr := resourceBlock.GetAttribute("user_volume_encryption_enabled")
+			if attr != nil && attr.IsFalse() {
+				set.Add(
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' has the user volume encryption set to false", resourceBlock.FullName())).
+						WithRange(attr.Range()).
+						WithAttributeAnnotation(attr),
+				)
 			}
 
 		},

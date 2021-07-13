@@ -3,21 +3,20 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
-// AzureUnencryptedManagedDisk See https://github.com/tfsec/tfsec#included-checks for check info
 const AzureUnencryptedManagedDisk = "AZU003"
 const AzureUnencryptedManagedDiskDescription = "Unencrypted managed disk."
 const AzureUnencryptedManagedDiskImpact = "Data could be read if compromised"
@@ -53,11 +52,12 @@ func init() {
 				"https://www.terraform.io/docs/providers/azurerm/r/managed_disk.html",
 			},
 		},
-		Provider:       provider.AzureProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"azurerm_managed_disk"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
-			encryptionSettingsBlock := block.GetBlock("encryption_settings")
+		Provider:        provider.AzureProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"azurerm_managed_disk"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
+			encryptionSettingsBlock := resourceBlock.GetBlock("encryption_settings")
 			if encryptionSettingsBlock == nil {
 				return // encryption is by default now, so this is fine
 			}
@@ -65,14 +65,13 @@ func init() {
 			enabledAttr := encryptionSettingsBlock.GetAttribute("enabled")
 			if enabledAttr != nil && enabledAttr.IsFalse() {
 				set.Add(
-					result.New().
+					result.New(resourceBlock).
 						WithDescription(fmt.Sprintf(
 							"Resource '%s' defines an unencrypted managed disk.",
-							block.FullName(),
+							resourceBlock.FullName(),
 						)).
 						WithRange(enabledAttr.Range()).
-						WithAttributeAnnotation(enabledAttr).
-						WithSeverity(severity.Error),
+						WithAttributeAnnotation(enabledAttr),
 				)
 			}
 

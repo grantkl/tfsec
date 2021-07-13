@@ -3,9 +3,9 @@ package main
 import (
 	"testing"
 
-	"github.com/tfsec/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/result"
 
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -15,11 +15,11 @@ func Test_IfIgnoreWarningsSetShouldRemoveWarningScanResults(t *testing.T) {
 	twoScanResultsWithOneWarning := []result.Result{
 		{
 			RuleID:   "1",
-			Severity: severity.Error,
+			Severity: severity.High,
 		},
 		{
 			RuleID:   "2",
-			Severity: severity.Warning,
+			Severity: severity.Medium,
 		},
 	}
 
@@ -32,11 +32,11 @@ func Test_IfIgnoreWarningsIsNotSetThenWarningShouldBeInScanResults(t *testing.T)
 	twoScanResultsWithOneWarning := []result.Result{
 		{
 			RuleID:   "1",
-			Severity: severity.Error,
+			Severity: severity.High,
 		},
 		{
 			RuleID:   "2",
-			Severity: severity.Warning,
+			Severity: severity.Medium,
 		},
 	}
 

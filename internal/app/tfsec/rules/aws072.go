@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSCloudfrontDistributionViewerProtocolPolicyHTTPS = "AWS072"
@@ -85,29 +85,29 @@ func init() {
 				"https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudfront_distribution#viewer_protocol_policy",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_cloudfront_distribution"},
-		CheckFunc: func(set result.Set, b *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_cloudfront_distribution"},
+		DefaultSeverity: severity.Critical,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			defaultCacheBlock := b.GetBlock("default_cache_behavior")
-			if defaultCacheBlock.GetAttribute("viewer_protocol_policy").Equals("allow-all", block.IgnoreCase) {
-				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' does not use HTTPS in Viewer Protocol Policy", b.FullName())).
-						WithRange(defaultCacheBlock.Range()).
-						WithSeverity(severity.Error),
-				)
+			if defaultCacheBlock := resourceBlock.GetBlock("default_cache_behavior"); defaultCacheBlock != nil {
+				if attr := defaultCacheBlock.GetAttribute("viewer_protocol_policy"); attr != nil && attr.Equals("allow-all", block.IgnoreCase) {
+					set.Add(
+						result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("Resource '%s' does not use HTTPS in Viewer Protocol Policy", resourceBlock.FullName())).
+							WithRange(defaultCacheBlock.Range()),
+					)
+				}
 			}
 
-			orderedCacheBlocks := b.GetBlocks("ordered_cache_behavior")
+			orderedCacheBlocks := resourceBlock.GetBlocks("ordered_cache_behavior")
 			for _, orderedCacheBlock := range orderedCacheBlocks {
-				if orderedCacheBlock.GetAttribute("viewer_protocol_policy").Equals("allow-all", block.IgnoreCase) {
+				if attr := orderedCacheBlock.GetAttribute("viewer_protocol_policy"); attr != nil && attr.Equals("allow-all", block.IgnoreCase) {
 					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' does not use HTTPS in Viewer Protocol Policy", b.FullName())).
-							WithRange(orderedCacheBlock.Range()).
-							WithSeverity(severity.Error),
+						result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("Resource '%s' does not use HTTPS in Viewer Protocol Policy", resourceBlock.FullName())).
+							WithRange(orderedCacheBlock.Range()),
 					)
 				}
 			}

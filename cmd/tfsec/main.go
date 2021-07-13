@@ -7,27 +7,27 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/tfsec/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/result"
 
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/config"
-	"github.com/tfsec/tfsec/internal/app/tfsec/updater"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/config"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/updater"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/custom"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/custom"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/debug"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/debug"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/formatters"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/formatters"
 
 	"github.com/liamg/tml"
 
 	"github.com/spf13/cobra"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/parser"
-	_ "github.com/tfsec/tfsec/internal/app/tfsec/rules"
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
-	"github.com/tfsec/tfsec/version"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/parser"
+	_ "github.com/aquasecurity/tfsec/internal/app/tfsec/rules"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/version"
 )
 
 var showVersion = false
@@ -37,7 +37,7 @@ var format string
 var softFail = false
 var filterResults string
 var excludedRuleIDs string
-var tfvarsPath string
+var tfvarsPaths []string
 var outputFlag string
 var customCheckDir string
 var configFile string
@@ -52,6 +52,7 @@ var ignoreInfo = false
 var allDirs = false
 var runStatistics bool
 var ignoreHCLErrors bool
+var stopOnCheckError bool
 
 func init() {
 	rootCmd.Flags().BoolVar(&ignoreHCLErrors, "ignore-hcl-errors", ignoreHCLErrors, "Stop and report an error if an HCL parse error is encountered")
@@ -63,7 +64,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&excludedRuleIDs, "exclude", "e", excludedRuleIDs, "Provide comma-separated list of rule IDs to exclude from run.")
 	rootCmd.Flags().StringVar(&filterResults, "filter-results", filterResults, "Filter results to return specific checks only (supports comma-delimited input).")
 	rootCmd.Flags().BoolVarP(&softFail, "soft-fail", "s", softFail, "Runs checks but suppresses error code")
-	rootCmd.Flags().StringVar(&tfvarsPath, "tfvars-file", tfvarsPath, "Path to .tfvars file")
+	rootCmd.Flags().StringSliceVar(&tfvarsPaths, "tfvars-file", tfvarsPaths, "Path to .tfvars file, can be used multiple times and evaluated in order of specification")
 	rootCmd.Flags().StringVar(&outputFlag, "out", outputFlag, "Set output file")
 	rootCmd.Flags().StringVar(&customCheckDir, "custom-check-dir", customCheckDir, "Explicitly the custom checks dir location")
 	rootCmd.Flags().StringVar(&configFile, "config-file", configFile, "Config file to use during run")
@@ -77,6 +78,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&runStatistics, "run-statistics", runStatistics, "View statistics table of current findings.")
 	rootCmd.Flags().BoolVar(&ignoreWarnings, "ignore-warnings", ignoreWarnings, "Don't show warnings in the output.")
 	rootCmd.Flags().BoolVar(&ignoreInfo, "ignore-info", ignoreWarnings, "Don't show info results in the output.")
+	rootCmd.Flags().BoolVarP(&stopOnCheckError, "allow-checks-to-panic", "p", stopOnCheckError, "Allow panics to propagate up from rule checking")
 }
 
 func main() {
@@ -99,7 +101,11 @@ var rootCmd = &cobra.Command{
 		}
 
 		if showVersion {
-			fmt.Println(version.Version)
+			if version.Version == "" {
+				fmt.Println("You are running a locally built version of tfsec.")
+			} else {
+				fmt.Println(version.Version)
+			}
 			os.Exit(0)
 		}
 
@@ -159,7 +165,7 @@ var rootCmd = &cobra.Command{
 		debug.Log("custom check directory set to %s", customCheckDir)
 		err = custom.Load(customCheckDir)
 		if err != nil {
-			_, _ = fmt.Fprint(os.Stderr, fmt.Sprintf("There were errors while processing custom check files. %s", err))
+			_, _ = fmt.Fprintf(os.Stderr, "There were errors while processing custom check files. %s", err)
 			os.Exit(1)
 		}
 		debug.Log("Custom checks loaded")
@@ -169,6 +175,9 @@ var rootCmd = &cobra.Command{
 		}
 
 		if outputFlag != "" {
+			if format == "" {
+				format = "text"
+			}
 			f, err := os.OpenFile(filepath.Clean(outputFlag), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 			if err != nil {
 				fmt.Println(err)
@@ -186,7 +195,7 @@ var rootCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if tfvarsPath == "" && unusedTfvarsPresent(dir) {
+		if len(tfvarsPaths) == 0 && unusedTfvarsPresent(dir) {
 			_ = tml.Printf("\n<yellow>Warning: A tfvars file was found but not automatically used. \nDid you mean to specify the --tfvars-file flag?</yellow>\n")
 		}
 
@@ -236,7 +245,7 @@ var rootCmd = &cobra.Command{
 			os.Exit(getDetailedExitCode(results))
 		}
 
-		// If all failed rules are of INFO severity, then produce a success
+		// If all failed rules are of LOW severity, then produce a success
 		// exit code (0).
 		if allInfo(results) {
 			return nil
@@ -252,13 +261,18 @@ func getParserOptions() []parser.Option {
 	if allDirs {
 		opts = append(opts, parser.OptionDoNotSearchTfFiles())
 	}
-	if tfvarsPath != "" {
-		tfvarsPath, err := filepath.Abs(tfvarsPath)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+	var validTfVarFiles []string
+	if len(tfvarsPaths) > 0 {
+		for _, tfvarsPath := range tfvarsPaths {
+			tfvp, err := filepath.Abs(tfvarsPath)
+			if err != nil {
+				fmt.Println(err)
+			}
+			if _, err := os.Stat(tfvp); err == nil {
+				validTfVarFiles = append(validTfVarFiles, tfvp)
+			}
 		}
-		opts = append(opts, parser.OptionWithTFVarsPath(tfvarsPath))
+		opts = append(opts, parser.OptionWithTFVarsPaths(validTfVarFiles))
 	}
 	if !ignoreHCLErrors {
 		opts = append(opts, parser.OptionStopOnHCLError())
@@ -272,13 +286,13 @@ func getDetailedExitCode(results []result.Result) int {
 		return 0
 	}
 
-	// If there are some failed rules but they are all of INFO severity, then
+	// If there are some failed rules but they are all of LOW severity, then
 	// produce a special failure exit code (2).
 	if allInfo(results) {
 		return 2
 	}
 
-	// If there is any failed check of ERROR or WARNING severity, then
+	// If there is any failed check of HIGH or WARNING severity, then
 	// produce the regular failure exit code (1).
 	return 1
 }
@@ -296,11 +310,11 @@ func RemoveDuplicatesAndUnwanted(results []result.Result, ignoreWarnings bool, e
 			continue
 		}
 
-		if ignoreWarnings && res.Severity == severity.Warning {
+		if ignoreWarnings && res.Severity == severity.Medium {
 			continue
 		}
 
-		if ignoreInfo && res.Severity == severity.Info {
+		if ignoreInfo && res.Severity == severity.Low {
 			continue
 		}
 
@@ -329,6 +343,8 @@ func getScannerOptions() []scanner.Option {
 		options = append(options, scanner.OptionIncludeIgnored())
 	}
 
+	options = append(options, scanner.OptionIgnoreCheckErrors(!stopOnCheckError))
+
 	var allExcludedRuleIDs []string
 	for _, exclude := range strings.Split(excludedRuleIDs, ",") {
 		allExcludedRuleIDs = append(allExcludedRuleIDs, strings.TrimSpace(exclude))
@@ -355,7 +371,7 @@ func mergeWithoutDuplicates(left, right []string) []string {
 
 func allInfo(results []result.Result) bool {
 	for _, res := range results {
-		if res.Severity != severity.Info && res.Status != result.Passed && res.Status != result.Ignored {
+		if res.Severity != severity.Low && res.Status != result.Passed && res.Status != result.Ignored {
 			return false
 		}
 	}

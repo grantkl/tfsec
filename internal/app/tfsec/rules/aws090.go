@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSECSClusterContainerInsights = "AWS090"
@@ -55,22 +55,22 @@ func init() {
 				"https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/ContainerInsights.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_ecs_cluster"},
-		CheckFunc: func(set result.Set, resourceBlock *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_ecs_cluster"},
+		DefaultSeverity: severity.Low,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
 			settingsBlock := resourceBlock.GetBlocks("setting")
 			for _, setting := range settingsBlock {
-				if name := setting.GetAttribute("name"); name.Equals("containerinsights", block.IgnoreCase) {
+				if name := setting.GetAttribute("name"); name != nil && name.Equals("containerinsights", block.IgnoreCase) {
 					if valueAttr := setting.GetAttribute("value"); valueAttr != nil {
 						if !valueAttr.Equals("enabled", block.IgnoreCase) {
 							set.Add(
-								result.New().
+								result.New(resourceBlock).
 									WithDescription(fmt.Sprintf("Resource '%s' has containerInsights set to disabled", resourceBlock.FullName())).
 									WithRange(setting.Range()).
-									WithAttributeAnnotation(valueAttr).
-									WithSeverity(severity.Info),
+									WithAttributeAnnotation(valueAttr),
 							)
 						}
 						return
@@ -78,10 +78,9 @@ func init() {
 				}
 			}
 			set.Add(
-				result.New().
-					WithDescription(fmt.Sprintf("Resoure '%s' does not have codeInsights enabled", resourceBlock.FullName())).
-					WithRange(resourceBlock.Range()).
-					WithSeverity(severity.Info),
+				result.New(resourceBlock).
+					WithDescription(fmt.Sprintf("Resource '%s' does not have containerInsights enabled", resourceBlock.FullName())).
+					WithRange(resourceBlock.Range()),
 			)
 		},
 	})

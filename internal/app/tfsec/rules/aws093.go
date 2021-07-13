@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSECRRepoCustomerManagedKeys = "AWS093"
@@ -70,36 +70,36 @@ func init() {
 				"https://docs.aws.amazon.com/AmazonECR/latest/userguide/encryption-at-rest.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_ecr_repository"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_ecr_repository"},
+		DefaultSeverity: severity.Low,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if block.MissingChild("encryption_configuration") {
+			if resourceBlock.MissingChild("encryption_configuration") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' does not have CMK encryption configured", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Info),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' does not have CMK encryption configured", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
+				return
 			}
 
-			encBlock := block.GetBlock("encryption_configuration")
+			encBlock := resourceBlock.GetBlock("encryption_configuration")
 			if encBlock.MissingChild("kms_key") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' configures encryption without using CMK", block.FullName())).
-WithRange(encBlock.Range()).
-						WithSeverity(severity.Info),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' configures encryption without using CMK", resourceBlock.FullName())).
+						WithRange(encBlock.Range()),
 				)
+				return
 			}
 
 			if encBlock.MissingChild("encryption_type") || encBlock.GetAttribute("encryption_type").Equals("AES256") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' should have the encryption type set to KMS", block.FullName())).
-WithRange(encBlock.Range()).
-						WithSeverity(severity.Info),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' should have the encryption type set to KMS", resourceBlock.FullName())).
+						WithRange(encBlock.Range()),
 				)
 			}
 

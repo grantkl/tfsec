@@ -3,21 +3,20 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
-// GoogleOpenInboundFirewallRule See https://github.com/tfsec/tfsec#included-checks for check info
 const GoogleOpenInboundFirewallRule = "GCP003"
 const GoogleOpenInboundFirewallRuleDescription = "An inbound firewall rule allows traffic from /0."
 const GoogleOpenInboundFirewallRuleImpact = "The port is exposed for ingress from the internet"
@@ -51,18 +50,18 @@ func init() {
 				"https://www.terraform.io/docs/providers/google/r/compute_firewall.html",
 			},
 		},
-		Provider:       provider.GCPProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"google_compute_firewall"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.GCPProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"google_compute_firewall"},
+		DefaultSeverity: severity.Critical,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if sourceRanges := block.GetAttribute("source_ranges"); sourceRanges != nil {
+			if sourceRanges := resourceBlock.GetAttribute("source_ranges"); sourceRanges != nil {
 				if isOpenCidr(sourceRanges) {
 					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' defines a fully open inbound firewall rule.", block.FullName())).
-							WithRange(sourceRanges.Range()).
-							WithSeverity(severity.Warning),
+						result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("Resource '%s' defines a fully open inbound firewall rule.", resourceBlock.FullName())).
+							WithRange(sourceRanges.Range()),
 					)
 				}
 			}

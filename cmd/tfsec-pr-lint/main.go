@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"os"
 
-	_ "github.com/tfsec/tfsec/internal/app/tfsec/rules"
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	_ "github.com/aquasecurity/tfsec/internal/app/tfsec/rules"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 func main() {
 	checks := scanner.GetRegisteredRules()
-	fmt.Printf("%d checks require linting\n", len(checks))
+	fmt.Printf("Checks requiring linting: %d\n", len(checks))
 
 	linter := &linter{}
 
@@ -18,6 +18,6 @@ func main() {
 		linter.lint(check)
 	}
 
-	fmt.Printf("%d checks require attention\n", linter.count)
-	os.Exit(linter.exitCode)
+	fmt.Printf("Checks requiring action:  %d\n", linter.count)
+	os.Exit(linter.exitCode())
 }

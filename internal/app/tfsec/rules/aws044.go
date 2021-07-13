@@ -3,23 +3,22 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 
 	"github.com/zclconf/go-cty/cty"
 )
 
-// AWSProviderHasAccessCredentials See https://github.com/tfsec/tfsec#included-checks for check info
 const AWSProviderHasAccessCredentials = "AWS044"
 const AWSProviderHasAccessCredentialsDescription = "AWS provider has access credentials specified."
 const AWSProviderHasAccessCredentialsImpact = "Exposing the credentials in the Terraform provider increases the risk of secret leakage"
@@ -52,26 +51,25 @@ func init() {
 				"https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"provider"},
-		RequiredLabels: []string{"aws"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"provider"},
+		RequiredLabels:  []string{"aws"},
+		DefaultSeverity: severity.Critical,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if accessKeyAttribute := block.GetAttribute("access_key"); accessKeyAttribute != nil && accessKeyAttribute.Type() == cty.String {
+			if accessKeyAttribute := resourceBlock.GetAttribute("access_key"); accessKeyAttribute != nil && accessKeyAttribute.Type() == cty.String {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Provider '%s' has an access key specified.", block.FullName())).
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Provider '%s' has an access key specified.", resourceBlock.FullName())).
 						WithRange(accessKeyAttribute.Range()).
-						WithAttributeAnnotation(accessKeyAttribute).
-						WithSeverity(severity.Error),
+						WithAttributeAnnotation(accessKeyAttribute),
 				)
-			} else if secretKeyAttribute := block.GetAttribute("secret_key"); secretKeyAttribute != nil && secretKeyAttribute.Type() == cty.String {
+			} else if secretKeyAttribute := resourceBlock.GetAttribute("secret_key"); secretKeyAttribute != nil && secretKeyAttribute.Type() == cty.String {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Provider '%s' has a secret key specified.", block.FullName())).
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Provider '%s' has a secret key specified.", resourceBlock.FullName())).
 						WithRange(secretKeyAttribute.Range()).
-						WithAttributeAnnotation(secretKeyAttribute).
-						WithSeverity(severity.Error),
+						WithAttributeAnnotation(secretKeyAttribute),
 				)
 			}
 

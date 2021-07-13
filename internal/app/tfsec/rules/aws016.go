@@ -2,22 +2,21 @@ package rules
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
 	"github.com/zclconf/go-cty/cty"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSUnencryptedSNSTopic = "AWS016"
@@ -53,54 +52,47 @@ func init() {
 				"https://docs.aws.amazon.com/sns/latest/dg/sns-server-side-encryption.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_sns_topic"},
-		CheckFunc: func(set result.Set, block *block.Block, ctx *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_sns_topic"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, ctx *hclcontext.Context) {
 
-			kmsKeyIDAttr := block.GetAttribute("kms_master_key_id")
+			kmsKeyIDAttr := resourceBlock.GetAttribute("kms_master_key_id")
 			if kmsKeyIDAttr == nil {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' defines an unencrypted SNS topic.", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Error),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' defines an unencrypted SNS topic.", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
 				return
 			} else if kmsKeyIDAttr.Type() == cty.String && kmsKeyIDAttr.Value().AsString() == "" {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' defines an unencrypted SNS topic.", block.FullName())).
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' defines an unencrypted SNS topic.", resourceBlock.FullName())).
 						WithRange(kmsKeyIDAttr.Range()).
-						WithAttributeAnnotation(kmsKeyIDAttr).
-						WithSeverity(severity.Error),
+						WithAttributeAnnotation(kmsKeyIDAttr),
 				)
 				return
 			}
 
-			if kmsKeyIDAttr.ReferencesDataBlock() {
-				ref := kmsKeyIDAttr.ReferenceAsString()
-				dataReferenceParts := strings.Split(ref, ".")
-				if len(dataReferenceParts) < 3 {
-				}
-				blockType := dataReferenceParts[0]
-				blockName := dataReferenceParts[1]
-				kmsKeyDatas := ctx.GetDatasByType(blockType)
-				for _, kmsData := range kmsKeyDatas {
-					if kmsData.NameLabel() == blockName {
-						keyIdAttr := kmsData.GetAttribute("key_id")
-						if keyIdAttr != nil && keyIdAttr.Equals("alias/aws/sns") {
-							set.Add(
-								result.New().
-									WithDescription(fmt.Sprintf("Resource '%s' explicitly uses the default CMK", block.FullName())).
-									WithRange(kmsKeyIDAttr.Range()).
-									WithAttributeAnnotation(kmsKeyIDAttr).
-									WithSeverity(severity.Warning),
-							)
-						}
-					}
+			if kmsKeyIDAttr.IsDataBlockReference() {
 
+				kmsData, err := ctx.GetReferencedBlock(kmsKeyIDAttr)
+				if err != nil {
+					return
 				}
+
+				keyIdAttr := kmsData.GetAttribute("key_id")
+				if keyIdAttr != nil && keyIdAttr.Equals("alias/aws/sns") {
+					set.Add(
+						result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("Resource '%s' explicitly uses the default CMK", resourceBlock.FullName())).
+							WithRange(kmsKeyIDAttr.Range()).
+							WithAttributeAnnotation(kmsKeyIDAttr),
+					)
+				}
+
 			}
 
 		},

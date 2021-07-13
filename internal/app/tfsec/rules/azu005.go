@@ -3,23 +3,22 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 
 	"github.com/zclconf/go-cty/cty"
 )
 
-// AzureVMWithPasswordAuthentication See https://github.com/tfsec/tfsec#included-checks for check info
 const AzureVMWithPasswordAuthentication = "AZU005"
 const AzureVMWithPasswordAuthenticationDescription = "Password authentication in use instead of SSH keys."
 const AzureVMWithPasswordAuthenticationImpact = "Passwords are potentially easier to compromise than SSH Keys"
@@ -55,23 +54,23 @@ func init() {
 				"https://www.terraform.io/docs/providers/azurerm/r/virtual_machine.html",
 			},
 		},
-		Provider:       provider.AzureProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"azurerm_virtual_machine"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AzureProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"azurerm_virtual_machine"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if linuxConfigBlock := block.GetBlock("os_profile_linux_config"); linuxConfigBlock != nil {
+			if linuxConfigBlock := resourceBlock.GetBlock("os_profile_linux_config"); linuxConfigBlock != nil {
 				passwordAuthDisabledAttr := linuxConfigBlock.GetAttribute("disable_password_authentication")
 				if passwordAuthDisabledAttr != nil && passwordAuthDisabledAttr.Type() == cty.Bool && passwordAuthDisabledAttr.Value().False() {
 					set.Add(
-						result.New().
+						result.New(resourceBlock).
 							WithDescription(fmt.Sprintf(
 								"Resource '%s' has password authentication enabled. Use SSH keys instead.",
-								block.FullName(),
+								resourceBlock.FullName(),
 							)).
 							WithRange(passwordAuthDisabledAttr.Range()).
-							WithAttributeAnnotation(passwordAuthDisabledAttr).
-							WithSeverity(severity.Error),
+							WithAttributeAnnotation(passwordAuthDisabledAttr),
 					)
 				}
 			}

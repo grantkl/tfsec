@@ -1,12 +1,10 @@
 <p align="center">
-  <img width="463" src="./tfsec.png">
+  <img width="500" src="./tfsec.png">
 </p>
 
-[![Travis Build Status](https://travis-ci.com/tfsec/tfsec.svg?branch=master)](https://travis-ci.com/tfsec/tfsec)
-[![GoReportCard](https://goreportcard.com/badge/github.com/tfsec/tfsec)](https://goreportcard.com/report/github.com/tfsec/tfsec)
-[![GitHub All Releases](https://img.shields.io/github/downloads/tfsec/tfsec/total)](https://github.com/tfsec/tfsec/releases)
+[![GoReportCard](https://goreportcard.com/badge/github.com/aquasecurity/tfsec)](https://goreportcard.com/report/github.com/aquasecurity/tfsec)
+[![GitHub All Releases](https://img.shields.io/github/downloads/aquasecurity/tfsec/total)](https://github.com/aquasecurity/tfsec/releases)
 [![Join Our Slack](https://img.shields.io/badge/Slack-Join-green)](https://join.slack.com/t/tfsec/shared_invite/zt-o6c7mgoj-eJ1sLDv595sKiP5OPoHJww)
-
 [![Docker Build](https://img.shields.io/docker/v/tfsec/tfsec?label=docker)](https://hub.docker.com/r/tfsec/tfsec)
 [![Homebrew](https://img.shields.io/badge/dynamic/json.svg?url=https://formulae.brew.sh/api/formula/tfsec.json&query=$.versions.stable&label=homebrew)](https://formulae.brew.sh/formula/tfsec)
 [![Chocolatey](https://img.shields.io/chocolatey/v/tfsec)](https://chocolatey.org/packages/tfsec)
@@ -14,7 +12,11 @@
 [![VScode Extension](https://img.shields.io/visual-studio-marketplace/v/tfsec.tfsec?label=vscode)](https://marketplace.visualstudio.com/items?itemName=tfsec.tfsec)
 
 tfsec uses static analysis of your terraform templates to spot potential
-security issues. Now with terraform v0.12+ support.
+security issues. Now with terraform CDK support.
+
+## Aqua and tfsec
+
+Great news - tfsec has [now joined Aqua Security](https://www.aquasec.com/news/aqua-security-acquires-tfsec/). Not only will the project remain open source, it now has a lot more resource and expertise behind it. Expect great new features and many more checks very soon...
 
 ## Example Output
 
@@ -34,13 +36,21 @@ Install with Chocolatey:
 choco install tfsec
 ```
 
-You can also grab the binary for your system from the [releases page](https://github.com/tfsec/tfsec/releases).
+You can also grab the binary for your system from the [releases page](https://github.com/aquasecurity/tfsec/releases).
 
 Alternatively, install with Go:
 
 ```bash
-go get -u github.com/tfsec/tfsec/cmd/tfsec
+go install github.com/aquasecurity/tfsec/cmd/tfsec@latest
 ```
+
+Please note that using `go install` will install directly from the `master` branch and version numbers will not be reported via `tfsec --version`.
+
+### Signing
+
+The binaries on the [releases page](https://github.com/aquasecurity/tfsec/releases) are signed with the tfsec signing key `D66B222A3EA4C25D5D1A097FC34ACEFB46EC39CE` 
+
+Form more information check the [signing page](SIGNING.md) for instructions on verification.
 
 ## Usage
 
@@ -77,7 +87,7 @@ A Visual Studio Code extension is being developed to integrate with tfsec result
 
 ## Use as GitHub Action
 
-If you want to run tfsec on your repository as a GitHub Action, you can use [https://github.com/triat/terraform-security-scan](https://github.com/triat/terraform-security-scan).
+If you want to run tfsec on your repository as a GitHub Action, you can use [https://github.com/aquasecurity/tfsec-pr-commenter-action](https://github.com/aquasecurity/tfsec-pr-commenter-action).
 
 ## Features
 
@@ -126,6 +136,13 @@ resource "aws_s3_bucket" "my-bucket" {
   acl    = "private"
 }
 ```
+
+### Expiration Date
+You can set expiration date for `ignore` with `yyyy-mm-dd` format. This is a useful feature when you want to ensure ignored issue won't be forgotten and should be revisited in the future.
+```
+#tfsec:ignore:AWS017:exp:2022-01-02
+```
+Ignore like this will be active only till `2022-01-02`, after this date it will be deactivated.
 
 ## Disable checks
 

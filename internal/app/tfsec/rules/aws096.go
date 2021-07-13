@@ -3,18 +3,18 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSECSTaskDefinitionEncryptionInTransit = "AWS096"
@@ -81,15 +81,17 @@ func init() {
 				"https://docs.aws.amazon.com/efs/latest/ug/encryption-in-transit.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_ecs_task_definition"},
-		CheckFunc: func(set result.Set, b *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_ecs_task_definition"},
+		DefaultSeverity: severity.High,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if b.MissingChild("volume") {
+			if resourceBlock.MissingChild("volume") {
+				return
 			}
 
-			volumeBlocks := b.GetBlocks("volume")
+			volumeBlocks := resourceBlock.GetBlocks("volume")
 			for _, v := range volumeBlocks {
 				if v.MissingChild("efs_volume_configuration") {
 					continue
@@ -97,21 +99,19 @@ func init() {
 				efsConfigBlock := v.GetBlock("efs_volume_configuration")
 				if efsConfigBlock.MissingChild("transit_encryption") {
 					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' has efs configuration with in transit encryption implicitly disabled", b.FullName())).
-							WithRange(b.Range()).
-							WithSeverity(severity.Error),
+						result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("Resource '%s' has efs configuration with in transit encryption implicitly disabled", resourceBlock.FullName())).
+							WithRange(resourceBlock.Range()),
 					)
+					continue
 				}
 				transitAttr := efsConfigBlock.GetAttribute("transit_encryption")
-
-				if transitAttr.Equals("disabled", block.IgnoreCase) {
+				if transitAttr != nil && transitAttr.Equals("disabled", block.IgnoreCase) {
 					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' has efs configuration with transit encryption explicitly disabled", b.FullName())).
+						result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("Resource '%s' has efs configuration with transit encryption explicitly disabled", resourceBlock.FullName())).
 							WithRange(transitAttr.Range()).
-							WithAttributeAnnotation(transitAttr).
-							WithSeverity(severity.Error),
+							WithAttributeAnnotation(transitAttr),
 					)
 				}
 			}

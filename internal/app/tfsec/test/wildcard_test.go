@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 func Test_WildcardMatchingOnRequiredLabels(t *testing.T) {
@@ -59,19 +59,19 @@ func Test_WildcardMatchingOnRequiredLabels(t *testing.T) {
 			Documentation: rule.RuleDocumentation{
 				Summary: "blah",
 			},
-			Provider:       "custom",
-			RequiredTypes:  []string{"resource"},
-			RequiredLabels: []string{test.pattern},
-			CheckFunc: func(set result.Set, rootBlock *block.Block, ctx *hclcontext.Context) {
+			Provider:        "custom",
+			RequiredTypes:   []string{"resource"},
+			RequiredLabels:  []string{test.pattern},
+			DefaultSeverity: severity.High,
+			CheckFunc: func(set result.Set, rootBlock block.Block, ctx *hclcontext.Context) {
 				set.Add(
-					result.New().WithDescription(fmt.Sprintf("Custom check failed for resource %s.", rootBlock.FullName())).
-						WithRange(rootBlock.Range()).
-						WithSeverity(severity.Error),
+					result.New(rootBlock).WithDescription(fmt.Sprintf("Custom check failed for resource %s.", rootBlock.FullName())).
+						WithRange(rootBlock.Range()),
 				)
 			},
 		})
 
-		results := scanSource(test.input)
+		results := scanHCL(test.input, t)
 
 		if test.expectedFailure {
 			assertCheckCode(t, code, "", results)

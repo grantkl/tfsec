@@ -3,24 +3,24 @@ package rules
 import (
 	"fmt"
 
-	"github.com/tfsec/tfsec/pkg/result"
-	"github.com/tfsec/tfsec/pkg/severity"
+	"github.com/aquasecurity/tfsec/pkg/result"
+	"github.com/aquasecurity/tfsec/pkg/severity"
 
-	"github.com/tfsec/tfsec/pkg/provider"
+	"github.com/aquasecurity/tfsec/pkg/provider"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/hclcontext"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/hclcontext"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/block"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/block"
 
-	"github.com/tfsec/tfsec/pkg/rule"
+	"github.com/aquasecurity/tfsec/pkg/rule"
 
-	"github.com/tfsec/tfsec/internal/app/tfsec/scanner"
+	"github.com/aquasecurity/tfsec/internal/app/tfsec/scanner"
 )
 
 const AWSDynamoDBTableEncryption = "AWS092"
-const AWSDynamoDBTableEncryptionDescription = "DynamoDB tables should use at rest encyption with a Customer Managed Key"
+const AWSDynamoDBTableEncryptionDescription = "DynamoDB tables should use at rest encryption with a Customer Managed Key"
 const AWSDynamoDBTableEncryptionImpact = "Using AWS managed keys does not allow for fine grained control"
-const AWSDynamoDBTableEncryptionResolution = "Enable server side encrytion with a customer managed key"
+const AWSDynamoDBTableEncryptionResolution = "Enable server side encryption with a customer managed key"
 const AWSDynamoDBTableEncryptionExplanation = `
 DynamoDB tables are encrypted by default using AWS managed encryption keys. To increase control of the encryption and control the management of factors like key rotation, use a Customer Managed Key.
 `
@@ -93,29 +93,29 @@ func init() {
 				"https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/EncryptionAtRest.html",
 			},
 		},
-		Provider:       provider.AWSProvider,
-		RequiredTypes:  []string{"resource"},
-		RequiredLabels: []string{"aws_dynamodb_table"},
-		CheckFunc: func(set result.Set, block *block.Block, _ *hclcontext.Context) {
+		Provider:        provider.AWSProvider,
+		RequiredTypes:   []string{"resource"},
+		RequiredLabels:  []string{"aws_dynamodb_table"},
+		DefaultSeverity: severity.Low,
+		CheckFunc: func(set result.Set, resourceBlock block.Block, _ *hclcontext.Context) {
 
-			if block.MissingChild("server_side_encryption") {
+			if resourceBlock.MissingChild("server_side_encryption") {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' is not using KMS CMK for encryption", block.FullName())).
-						WithRange(block.Range()).
-						WithSeverity(severity.Info),
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' is not using KMS CMK for encryption", resourceBlock.FullName())).
+						WithRange(resourceBlock.Range()),
 				)
+				return
 			}
 
-			sseBlock := block.GetBlock("server_side_encryption")
+			sseBlock := resourceBlock.GetBlock("server_side_encryption")
 			enabledAttr := sseBlock.GetAttribute("enabled")
-			if enabledAttr.IsFalse() {
+			if enabledAttr != nil && enabledAttr.IsFalse() {
 				set.Add(
-					result.New().
-						WithDescription(fmt.Sprintf("Resource '%s' has server side encryption configured but disabled", block.FullName())).
+					result.New(resourceBlock).
+						WithDescription(fmt.Sprintf("Resource '%s' has server side encryption configured but disabled", resourceBlock.FullName())).
 						WithRange(enabledAttr.Range()).
-						WithAttributeAnnotation(enabledAttr).
-						WithSeverity(severity.Info),
+						WithAttributeAnnotation(enabledAttr),
 				)
 			}
 
@@ -123,11 +123,10 @@ func init() {
 				keyIdAttr := sseBlock.GetAttribute("kms_key_arn")
 				if keyIdAttr.Equals("alias/aws/dynamodb") {
 					set.Add(
-						result.New().
-							WithDescription(fmt.Sprintf("Resource '%s' has KMS encryption configured but is using the default aws key", block.FullName())).
+						result.New(resourceBlock).
+							WithDescription(fmt.Sprintf("Resource '%s' has KMS encryption configured but is using the default aws key", resourceBlock.FullName())).
 							WithRange(keyIdAttr.Range()).
-							WithAttributeAnnotation(keyIdAttr).
-							WithSeverity(severity.Info),
+							WithAttributeAnnotation(keyIdAttr),
 					)
 				}
 			}
